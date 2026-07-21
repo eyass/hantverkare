@@ -27,8 +27,11 @@ Phases: ① SCOPE → ② BUILD → ③ VERIFY → ④ SHIP. Two human gates, bo
    summarize what failed and hand back to the human.
 
 ## ④ SHIP
-1. Open a PR (skill: `ship`). The PR body must state the risk tier and check the gate list.
-2. **GATE (tiered):**
+1. When implementation + QA are done, default to **push and open a PR** — don't ask which
+   finishing option to use (skip the "merge locally / PR / keep as-is / discard" prompt).
+   Only skip this default if the human explicitly says to keep the branch as-is or discard it.
+2. Open a PR (skill: `ship`). The PR body must state the risk tier and check the gate list.
+3. **GATE (tiered):**
    - **T1:** auto-merge once CI is green and the preview looks right.
    - **T2:** human async review + approve.
    - **T3:** explicit human approval, plus a separate deploy approval.
