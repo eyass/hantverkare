@@ -101,6 +101,13 @@ export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: Lin
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <h1 className="text-2xl font-semibold">Angebot {statusLabel(status)}</h1>
       <p className="text-zinc-600 dark:text-zinc-400">{quote.customer_description}</p>
+      <a
+        href={`/quotes/${quote.id}/pdf`}
+        download
+        className="self-start rounded-full border border-zinc-300 px-5 py-3 text-sm dark:border-zinc-700"
+      >
+        Als PDF herunterladen
+      </a>
       {(status === "final" || status === "signed") && (
         <label className="flex flex-col gap-1 text-sm">
           Link für den Kunden
