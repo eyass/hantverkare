@@ -26,11 +26,13 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   // control. Drafts aren't meant to be shared yet.
   if (quote.status === "draft") {
     return (
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-        <h1 className="text-2xl font-semibold">Angebot</h1>
-        <p className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          Dieses Angebot ist noch nicht bereit zur Ansicht.
-        </p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] p-6">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
+          <h1 className="text-xl font-semibold text-[#0f172a]">Angebot</h1>
+          <p className="mt-4 text-sm text-[#64748b]">
+            Dieses Angebot ist noch nicht bereit zur Ansicht.
+          </p>
+        </div>
       </div>
     );
   }
@@ -46,46 +48,60 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Angebot</h1>
-      <p className="text-zinc-600 dark:text-zinc-400">{quote.customer_description}</p>
+    <div className="min-h-screen bg-[#0f172a] px-4 py-10 sm:px-8">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6 rounded-2xl bg-white p-6 shadow-xl sm:p-10">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#0f172a]">Angebot</h1>
+          <p className="mt-1 text-sm text-[#64748b]">{quote.customer_description}</p>
+        </div>
 
-      <table className="w-full border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-300 dark:border-zinc-700">
-            <th className="py-2">Beschreibung</th>
-            <th className="py-2">Menge</th>
-            <th className="py-2">Einheit</th>
-            <th className="py-2">Einzelpreis</th>
-            <th className="py-2">Gesamt</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(lineItems ?? []).map((item) => (
-            <tr key={item.id} className="border-b border-zinc-200 dark:border-zinc-800">
-              <td className="py-2">{item.description}</td>
-              <td className="py-2">{item.quantity}</td>
-              <td className="py-2">{item.unit}</td>
-              <td className="py-2">{formatEuros(item.unit_price_cents)}</td>
-              <td className="py-2">{formatEuros(item.line_total_cents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        <div className="overflow-x-auto rounded-xl border border-[#e9edf2]">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#e9edf2] bg-[#f4f6f8] text-[#64748b]">
+                <th className="px-4 py-3 font-medium">Beschreibung</th>
+                <th className="px-4 py-3 font-medium">Menge</th>
+                <th className="px-4 py-3 font-medium">Einheit</th>
+                <th className="px-4 py-3 font-medium">Einzelpreis</th>
+                <th className="px-4 py-3 font-medium">Gesamt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(lineItems ?? []).map((item) => (
+                <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
+                  <td className="px-4 py-3 text-[#0f172a]">{item.description}</td>
+                  <td className="px-4 py-3 font-mono text-[#0f172a]">{item.quantity}</td>
+                  <td className="px-4 py-3 text-[#64748b]">{item.unit}</td>
+                  <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.unit_price_cents)}</td>
+                  <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.line_total_cents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      <div className="flex flex-col items-end gap-1 text-sm">
-        <p>Zwischensumme: {formatEuros(quote.subtotal_cents)}</p>
-        <p>MwSt. (19%): {formatEuros(quote.vat_cents)}</p>
-        <p className="text-base font-semibold">Gesamt: {formatEuros(quote.total_cents)}</p>
+        <div className="flex flex-col items-end gap-1 self-end text-sm">
+          <p className="text-[#64748b]">
+            Zwischensumme: <span className="font-mono text-[#0f172a]">{formatEuros(quote.subtotal_cents)}</span>
+          </p>
+          <p className="text-[#64748b]">
+            MwSt. (19%): <span className="font-mono text-[#0f172a]">{formatEuros(quote.vat_cents)}</span>
+          </p>
+          <p className="text-base font-semibold text-[#0f172a]">
+            Gesamt: <span className="font-mono">{formatEuros(quote.total_cents)}</span>
+          </p>
+        </div>
+
+        {quote.status === "final" && <SignForm token={token} />}
+
+        {quote.status === "signed" && (
+          <div className="rounded-2xl bg-[#dcfce7] p-6 text-center">
+            <p className="text-sm font-medium text-[#16a34a]">
+              Signiert am {quote.signed_at ? formatDate(quote.signed_at) : "-"} von {quote.signer_name ?? "-"}.
+            </p>
+          </div>
+        )}
       </div>
-
-      {quote.status === "final" && <SignForm token={token} />}
-
-      {quote.status === "signed" && (
-        <p className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-          Signiert am {quote.signed_at ? formatDate(quote.signed_at) : "-"} von {quote.signer_name ?? "-"}.
-        </p>
-      )}
     </div>
   );
 }
