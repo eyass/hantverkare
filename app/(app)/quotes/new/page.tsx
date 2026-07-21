@@ -12,5 +12,9 @@ export default async function NewQuotePage() {
     console.error("Failed to load customers:", error);
   }
 
-  return <NewQuoteForm customers={customers ?? []} />;
+  return (
+    <div className="min-h-full bg-[#f4f6f8]">
+      <NewQuoteForm customers={customers ?? []} />
+    </div>
+  );
 }
