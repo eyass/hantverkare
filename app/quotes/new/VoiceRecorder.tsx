@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { transcribeAudio } from "./actions";
 
 const MAX_RECORDING_SECONDS = 120;
@@ -14,6 +14,15 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mimeTypeRef = useRef<string>("audio/webm");
+
+  useEffect(() => {
+    return () => {
+      stopTimer();
+      stopStream();
+      mediaRecorderRef.current?.stop();
+    };
+  }, []);
 
   function stopTimer() {
     if (timerRef.current) {
@@ -27,8 +36,18 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
     streamRef.current = null;
   }
 
+  function pickSupportedMimeType(): string | null {
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    for (const candidate of candidates) {
+      if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
   async function handleRecordingComplete() {
-    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+    const blob = new Blob(chunksRef.current, { type: mimeTypeRef.current });
     chunksRef.current = [];
     setIsTranscribing(true);
     setError(null);
@@ -47,7 +66,22 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
   }
 
   async function startRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      return;
+    }
     setError(null);
+
+    if (typeof MediaRecorder === "undefined") {
+      setError("Sprachaufnahme wird in diesem Browser nicht unterstützt.");
+      return;
+    }
+
+    const mimeType = pickSupportedMimeType();
+    if (!mimeType) {
+      setError("Sprachaufnahme wird in diesem Browser nicht unterstützt.");
+      return;
+    }
+
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -58,7 +92,18 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
 
     streamRef.current = stream;
     chunksRef.current = [];
-    const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+    mimeTypeRef.current = mimeType;
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch (err) {
+      console.error("Failed to create MediaRecorder:", err);
+      setError("Sprachaufnahme wird in diesem Browser nicht unterstützt.");
+      stopStream();
+      return;
+    }
+
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         chunksRef.current.push(event.data);
