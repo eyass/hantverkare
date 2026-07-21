@@ -21,6 +21,20 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     .single();
   if (!quote) notFound();
 
+  // Defense in depth: a draft quote's pricing detail is never fetched or rendered for
+  // the public link, even though an unguessable share_token is the primary access
+  // control. Drafts aren't meant to be shared yet.
+  if (quote.status === "draft") {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+        <h1 className="text-2xl font-semibold">Angebot</h1>
+        <p className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          Dieses Angebot ist noch nicht bereit zur Ansicht.
+        </p>
+      </div>
+    );
+  }
+
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
     .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
@@ -70,12 +84,6 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
       {quote.status === "signed" && (
         <p className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
           Signiert am {quote.signed_at ? formatDate(quote.signed_at) : "-"} von {quote.signer_name ?? "-"}.
-        </p>
-      )}
-
-      {quote.status === "draft" && (
-        <p className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          Dieses Angebot ist noch nicht bereit zur Ansicht.
         </p>
       )}
     </div>
