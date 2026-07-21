@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git -c user.email=eyass@petmediagroup.com -c user.name=eyass commit -q -m 'docs: AI engineering harness design spec *)"
+      "Bash(git -c user.email=eyass@petmediagroup.com -c user.name=eyass commit -q -m 'docs: AI engineering harness design spec *)",
+      "Bash(git -c user.email=eyass@petmediagroup.com -c user.name=eyass commit -q -m 'chore: add .gitignore \\(macOS, node, env, build artifacts\\) *)",
+      "Bash(git -c user.email=eyass@petmediagroup.com -c user.name=eyass commit -q -m 'chore: update local permission allowlist *)"
     ]
   }
 }
