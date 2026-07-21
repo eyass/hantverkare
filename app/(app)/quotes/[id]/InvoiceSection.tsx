@@ -38,37 +38,37 @@ export function InvoiceSection({ quoteId, invoice: initialInvoice }: { quoteId: 
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded border border-zinc-300 p-4 dark:border-zinc-700">
-      <h2 className="text-lg font-semibold">Rechnung</h2>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+    <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-[#f8fafc] p-4">
+      <h2 className="text-sm font-semibold text-[#0f172a]">Rechnung</h2>
+      {error && <p className="text-sm text-[#dc2626]">{error}</p>}
       {invoice ? (
-        <dl className="flex flex-col gap-1 text-sm">
+        <dl className="flex flex-col gap-1.5 text-sm">
           <div className="flex justify-between">
-            <dt>Rechnungsnummer</dt>
-            <dd className="font-medium">{invoice.invoice_number}</dd>
+            <dt className="text-[#64748b]">Rechnungsnummer</dt>
+            <dd className="font-mono font-medium text-[#0f172a]">{invoice.invoice_number}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>Rechnungsdatum</dt>
-            <dd>{formatDate(invoice.issued_at)}</dd>
+            <dt className="text-[#64748b]">Rechnungsdatum</dt>
+            <dd className="font-mono text-[#0f172a]">{formatDate(invoice.issued_at)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>Zwischensumme</dt>
-            <dd>{formatEuros(invoice.subtotal_cents)}</dd>
+            <dt className="text-[#64748b]">Zwischensumme</dt>
+            <dd className="font-mono text-[#0f172a]">{formatEuros(invoice.subtotal_cents)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>MwSt.</dt>
-            <dd>{formatEuros(invoice.vat_cents)}</dd>
+            <dt className="text-[#64748b]">MwSt.</dt>
+            <dd className="font-mono text-[#0f172a]">{formatEuros(invoice.vat_cents)}</dd>
           </div>
-          <div className="flex justify-between font-semibold">
-            <dt>Gesamt</dt>
-            <dd>{formatEuros(invoice.total_cents)}</dd>
+          <div className="flex justify-between border-t border-[#e9edf2] pt-1.5 font-semibold">
+            <dt className="text-[#0f172a]">Gesamt</dt>
+            <dd className="font-mono text-[#0f172a]">{formatEuros(invoice.total_cents)}</dd>
           </div>
         </dl>
       ) : (
         <button
           onClick={handleCreateInvoice}
           disabled={isPending}
-          className="self-end rounded-full bg-foreground px-5 py-3 text-background disabled:opacity-50"
+          className="w-full rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           Rechnung erstellen
         </button>
