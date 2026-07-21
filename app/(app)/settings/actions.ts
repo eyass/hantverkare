@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 
 export type BusinessSettingsInput = {
   companyName: string;
@@ -34,8 +35,16 @@ export async function saveBusinessSettings(
     return { error: "Bitte melde dich an." };
   }
 
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  // business_settings is now one row per organization (PK organization_id).
+  // user_id is retained only as an audit "last editor" column.
   const { error } = await supabase.from("business_settings").upsert(
     {
+      organization_id: org.organizationId,
       user_id: user.id,
       company_name: normalize(input.companyName),
       address: normalize(input.address),
@@ -43,7 +52,7 @@ export async function saveBusinessSettings(
       tax_number: normalize(input.taxNumber),
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "user_id" },
+    { onConflict: "organization_id" },
   );
   if (error) {
     console.error("Failed to save business settings:", error);

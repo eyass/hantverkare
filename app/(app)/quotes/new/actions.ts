@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { generateLineItems, QuoteGenerationError } from "@/lib/quotes/generateLineItems";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 
@@ -31,6 +32,11 @@ export async function generateQuoteDraft(
   } = await supabase.auth.getUser();
   if (!user) {
     return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
   }
 
   const { data: priceList, error: priceListError } = await supabase
@@ -74,6 +80,7 @@ export async function generateQuoteDraft(
       subtotal_cents: totals.subtotalCents,
       vat_cents: totals.vatCents,
       total_cents: totals.totalCents,
+      organization_id: org.organizationId,
       user_id: user.id,
       customer_id: customerId,
     })
@@ -93,6 +100,7 @@ export async function generateQuoteDraft(
       unit_price_cents: item.unitPriceCents,
       line_total_cents: item.lineTotalCents,
       position: index,
+      organization_id: org.organizationId,
       user_id: user.id,
     })),
   );

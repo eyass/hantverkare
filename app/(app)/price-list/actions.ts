@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 
 export type PriceListItemInput = {
   label: string;
@@ -45,6 +46,11 @@ export async function createPriceListItem(input: PriceListItemInput): Promise<Cr
     return { error: "Bitte melde dich an." };
   }
 
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
   const { data, error } = await supabase
     .from("price_list_items")
     .insert({
@@ -52,6 +58,7 @@ export async function createPriceListItem(input: PriceListItemInput): Promise<Cr
       unit: input.unit,
       unit_price_cents: input.unitPriceCents,
       category: input.category,
+      organization_id: org.organizationId,
       user_id: user.id,
     })
     .select("id, label, unit, unit_price_cents, category")

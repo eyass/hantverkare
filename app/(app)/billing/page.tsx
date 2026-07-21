@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { canViewBilling } from "@/lib/organizations/permissions";
 import { createCheckoutSession, createBillingPortalSession } from "./actions";
 
 function formatDate(iso: string | null): string | null {
@@ -12,15 +14,29 @@ function formatDate(iso: string | null): string | null {
 
 export default async function BillingPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const org = await getCurrentOrg(supabase);
 
-  const { data: settings, error } = user
+  // Billing is per-organization and owner-only. Members see a notice instead of
+  // the subscription controls (the Server Actions also enforce this).
+  if (org && !canViewBilling(org.role)) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-10">
+        <h1 className="text-2xl font-semibold">Abonnement</h1>
+        <div className="mt-6 rounded-lg border p-6">
+          <p>
+            Das Abonnement wird vom Inhaber deiner Organisation verwaltet. Bitte
+            wende dich an den Inhaber, wenn du Fragen zur Abrechnung hast.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const { data: settings, error } = org
     ? await supabase
         .from("billing")
         .select("subscription_status, trial_ends_at, stripe_customer_id")
-        .eq("user_id", user.id)
+        .eq("organization_id", org.organizationId)
         .maybeSingle()
     : { data: null, error: null };
 

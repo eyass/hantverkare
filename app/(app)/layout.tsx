@@ -5,6 +5,7 @@ import { signOut } from "@/app/logout/actions";
 import { AppShell } from "@/components/AppShell";
 import { ensureTrialStarted } from "@/lib/billing/ensureTrial";
 import { shouldGateAccess } from "@/lib/billing/gating";
+import { ensureOrganization } from "@/lib/organizations/ensureOrganization";
 
 export default async function AuthenticatedLayout({
   children,
@@ -33,7 +34,17 @@ export default async function AuthenticatedLayout({
   const pathname = (await headers()).get("x-pathname") ?? "";
   const isBillingRoute = pathname === "/billing" || pathname.startsWith("/billing/");
 
-  const billingState = await ensureTrialStarted(user.id);
+  // Resolve (or create, for a brand-new signup) the user's organization before
+  // anything else -- it's the scoping key everything downstream relies on, and
+  // billing is now per-organization.
+  const org = await ensureOrganization(user.id);
+  if (!org) {
+    // Could not establish an org (e.g. transient DB error). Render without the
+    // shell rather than crashing; the next request retries.
+    return children;
+  }
+
+  const billingState = await ensureTrialStarted(org.organizationId);
 
   if (!isBillingRoute && shouldGateAccess({
     subscriptionStatus: billingState.subscriptionStatus,
@@ -43,7 +54,7 @@ export default async function AuthenticatedLayout({
   }
 
   return (
-    <AppShell email={user.email ?? ""} signOutAction={signOut}>
+    <AppShell email={user.email ?? ""} role={org.role} signOutAction={signOut}>
       {children}
     </AppShell>
   );

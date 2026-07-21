@@ -1,21 +1,58 @@
 import type Stripe from "stripe";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient } from "@/lib/stripe/client";
+
+// Billing is per-organization (see 0010). New Checkout sessions/subscriptions
+// carry metadata.organization_id. Subscriptions created before the multi-user
+// migration may still carry only metadata.user_id -- resolve those to an org
+// via that user's membership so existing subscriptions keep working.
+async function resolveOrganizationId(
+  supabase: SupabaseClient,
+  metadata: Stripe.Metadata | null | undefined,
+  fallbackUserId?: string | null,
+): Promise<string | null> {
+  const orgId = metadata?.organization_id;
+  if (orgId) {
+    return orgId;
+  }
+
+  const userId = metadata?.user_id ?? fallbackUserId ?? null;
+  if (!userId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Failed to resolve organization for legacy user_id metadata:", error);
+    return null;
+  }
+  return data?.organization_id ?? null;
+}
 
 // Stripe requires the raw request body for signature verification, so this
 // route must not run any body-parsing middleware -- Route Handlers give us
 // the raw text directly via request.text(), which is what we use below.
 
-async function updateBusinessSettingsForSubscription(
+async function updateBillingForSubscription(
   subscription: Stripe.Subscription,
 ) {
-  const userId = subscription.metadata?.user_id;
-  if (!userId) {
-    console.error("Stripe subscription is missing metadata.user_id:", subscription.id);
+  const supabase = createAdminClient();
+  const organizationId = await resolveOrganizationId(supabase, subscription.metadata);
+  if (!organizationId) {
+    console.error(
+      "Stripe subscription has no resolvable organization_id/user_id:",
+      subscription.id,
+    );
     return;
   }
 
-  const supabase = createAdminClient();
   const { error } = await supabase
     .from("billing")
     .update({
@@ -23,7 +60,7 @@ async function updateBusinessSettingsForSubscription(
       subscription_status: subscription.status,
       updated_at: new Date().toISOString(),
     })
-    .eq("user_id", userId);
+    .eq("organization_id", organizationId);
 
   if (error) {
     console.error("Failed to update billing from webhook:", error);
@@ -56,16 +93,23 @@ export async function POST(request: Request): Promise<Response> {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.metadata?.user_id ?? session.client_reference_id;
-      if (!userId) {
-        console.error("Stripe checkout session is missing user_id:", session.id);
+      const supabase = createAdminClient();
+      // client_reference_id now carries the organization_id (set in
+      // createCheckoutSession); metadata.organization_id is the primary source,
+      // with the legacy user_id path handled by resolveOrganizationId.
+      const organizationId = await resolveOrganizationId(
+        supabase,
+        session.metadata,
+        session.client_reference_id,
+      );
+      if (!organizationId) {
+        console.error("Stripe checkout session has no resolvable organization:", session.id);
         break;
       }
 
-      const supabase = createAdminClient();
       const { error } = await supabase.from("billing").upsert(
         {
-          user_id: userId,
+          organization_id: organizationId,
           stripe_customer_id:
             typeof session.customer === "string" ? session.customer : session.customer?.id,
           stripe_subscription_id:
@@ -75,7 +119,7 @@ export async function POST(request: Request): Promise<Response> {
           subscription_status: "active",
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "user_id" },
+        { onConflict: "organization_id" },
       );
 
       if (error) {
@@ -87,7 +131,7 @@ export async function POST(request: Request): Promise<Response> {
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
-      await updateBusinessSettingsForSubscription(subscription);
+      await updateBillingForSubscription(subscription);
       break;
     }
 
