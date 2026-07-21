@@ -13,12 +13,21 @@ export async function sendMagicLink(
     return { error: "Bitte gib eine gültige E-Mail-Adresse ein.", sent: false };
   }
 
+  const next = formData.get("next");
+  const safeNext =
+    typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : null;
+
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const callbackUrl = new URL(`${siteUrl}/auth/callback`);
+  if (safeNext) {
+    callbackUrl.searchParams.set("next", safeNext);
+  }
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
+      emailRedirectTo: callbackUrl.toString(),
     },
   });
   if (error) {
