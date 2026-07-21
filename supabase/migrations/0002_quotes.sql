@@ -14,6 +14,9 @@ create policy "Price list items are viewable by everyone"
   on public.price_list_items for select
   using (true);
 
+-- No insert/update/delete policy: correctly defaults to deny. The seeded price
+-- list is not editable via the app in this feature.
+
 -- No auth yet in this prototype: quotes are not scoped to a user. Policies are
 -- intentionally open — revisit once quotes are tied to a real account.
 create table if not exists public.quotes (
@@ -42,6 +45,11 @@ create policy "Anyone can update quotes"
   using (true)
   with check (true);
 
+-- Known gap: RLS does not enforce that a 'final' quote is immutable — only the
+-- app's Server Actions check status before allowing edits. Accepted as a
+-- prototype-scope limitation (no auth yet); revisit with a DB-level guard
+-- (e.g. a trigger) once quotes are tied to real accounts.
+
 create table if not exists public.quote_line_items (
   id uuid primary key default gen_random_uuid(),
   quote_id uuid not null references public.quotes(id) on delete cascade,
@@ -67,6 +75,9 @@ create policy "Anyone can update line items"
   on public.quote_line_items for update
   using (true)
   with check (true);
+
+-- Same known gap as quotes above: no DB-level guard against editing line
+-- items on an already-finalized quote, only the app's Server Actions.
 
 -- Seed a sample German Handwerker (Sanitär/Elektro-focused) price list, giving
 -- the AI real pricing context to match job descriptions against.
