@@ -34,9 +34,15 @@ type Invoice = {
 };
 
 function statusLabel(status: string): string {
-  if (status === "final") return "(final)";
-  if (status === "signed") return "(signiert)";
-  return "(Entwurf)";
+  if (status === "final") return "Final";
+  if (status === "signed") return "Signiert";
+  return "Entwurf";
+}
+
+function statusBadgeClasses(status: string): string {
+  if (status === "final") return "bg-[#dbeafe] text-[#1d4ed8]";
+  if (status === "signed") return "bg-[#dcfce7] text-[#16a34a]";
+  return "bg-[#f1f5f9] text-[#64748b]";
 }
 
 function formatEuros(cents: number): string {
@@ -116,93 +122,132 @@ export function QuoteEditor({
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Angebot {statusLabel(status)}</h1>
-      <p className="text-zinc-600 dark:text-zinc-400">{quote.customer_description}</p>
-      <a
-        href={`/quotes/${quote.id}/pdf`}
-        download
-        className="self-start rounded-full border border-zinc-300 px-5 py-3 text-sm dark:border-zinc-700"
-      >
-        Als PDF herunterladen
-      </a>
-      {(status === "final" || status === "signed") && (
-        <label className="flex flex-col gap-1 text-sm">
-          Link für den Kunden
-          <input
-            readOnly
-            value={`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/q/${quote.share_token}`}
-            onFocus={(e) => e.target.select()}
-            className="rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700"
-          />
-        </label>
-      )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <table className="w-full border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-300 dark:border-zinc-700">
-            <th className="py-2">Beschreibung</th>
-            <th className="py-2">Menge</th>
-            <th className="py-2">Einheit</th>
-            <th className="py-2">Einzelpreis</th>
-            <th className="py-2">Gesamt</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id} className="border-b border-zinc-200 dark:border-zinc-800">
-              <td className="py-2">
-                <input
-                  value={item.description}
-                  disabled={!isDraft}
-                  onChange={(e) => handleFieldChange(item.id, "description", e.target.value)}
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-full bg-transparent disabled:opacity-70"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  type="number"
-                  value={item.quantity}
-                  disabled={!isDraft}
-                  onChange={(e) => handleFieldChange(item.id, "quantity", e.target.value)}
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-20 bg-transparent disabled:opacity-70"
-                />
-              </td>
-              <td className="py-2">{item.unit}</td>
-              <td className="py-2">
-                <input
-                  type="number"
-                  value={item.unit_price_cents / 100}
-                  disabled={!isDraft}
-                  onChange={(e) =>
-                    handleFieldChange(item.id, "unit_price_cents", String(Math.round(Number(e.target.value) * 100)))
-                  }
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-24 bg-transparent disabled:opacity-70"
-                />
-              </td>
-              <td className="py-2">{formatEuros(item.line_total_cents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="flex flex-col items-end gap-1 text-sm">
-        <p>Zwischensumme: {formatEuros(totals.subtotalCents)}</p>
-        <p>MwSt. (19%): {formatEuros(totals.vatCents)}</p>
-        <p className="text-base font-semibold">Gesamt: {formatEuros(totals.totalCents)}</p>
-      </div>
-      {isDraft && (
-        <button
-          onClick={handleFinalize}
-          disabled={isPending}
-          className="self-end rounded-full bg-foreground px-5 py-3 text-background disabled:opacity-50"
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6 sm:p-8">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold text-[#0f172a]">Angebot</h1>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClasses(status)}`}
         >
-          Angebot finalisieren
-        </button>
+          {statusLabel(status)}
+        </span>
+      </div>
+      <p className="text-[#64748b]">{quote.customer_description}</p>
+
+      {error && (
+        <p className="rounded-xl border border-[#fecaca] bg-red-50 px-4 py-2 text-sm text-[#dc2626]">{error}</p>
       )}
-      {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Line items card */}
+        <div className="rounded-2xl border border-[#e9edf2] bg-white overflow-hidden">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#e9edf2] bg-[#f8fafc] text-xs uppercase tracking-wide text-[#94a3b8]">
+                <th className="px-4 py-3 font-medium">Beschreibung</th>
+                <th className="px-4 py-3 font-medium">Menge</th>
+                <th className="px-4 py-3 font-medium">Einheit</th>
+                <th className="px-4 py-3 font-medium">Einzelpreis</th>
+                <th className="px-4 py-3 font-medium">Gesamt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
+                  <td className="px-4 py-2">
+                    <input
+                      value={item.description}
+                      disabled={!isDraft}
+                      onChange={(e) => handleFieldChange(item.id, "description", e.target.value)}
+                      onBlur={() => handleBlurSave(item)}
+                      className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      disabled={!isDraft}
+                      onChange={(e) => handleFieldChange(item.id, "quantity", e.target.value)}
+                      onBlur={() => handleBlurSave(item)}
+                      className="w-20 rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-[#64748b]">{item.unit}</td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      value={item.unit_price_cents / 100}
+                      disabled={!isDraft}
+                      onChange={(e) =>
+                        handleFieldChange(
+                          item.id,
+                          "unit_price_cents",
+                          String(Math.round(Number(e.target.value) * 100)),
+                        )
+                      }
+                      onBlur={() => handleBlurSave(item)}
+                      className="font-mono w-24 rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
+                    />
+                  </td>
+                  <td className="font-mono px-4 py-2 font-medium text-[#0f172a]">
+                    {formatEuros(item.line_total_cents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary card */}
+        <div className="flex h-fit flex-col gap-4 rounded-2xl border border-[#e9edf2] bg-white p-5 lg:sticky lg:top-6">
+          <div className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between text-[#64748b]">
+              <span>Zwischensumme</span>
+              <span className="font-mono">{formatEuros(totals.subtotalCents)}</span>
+            </div>
+            <div className="flex justify-between text-[#64748b]">
+              <span>MwSt. (19%)</span>
+              <span className="font-mono">{formatEuros(totals.vatCents)}</span>
+            </div>
+            <div className="flex justify-between border-t border-[#e9edf2] pt-2 text-base font-semibold text-[#0f172a]">
+              <span>Gesamt</span>
+              <span className="font-mono">{formatEuros(totals.totalCents)}</span>
+            </div>
+          </div>
+
+          {isDraft && (
+            <button
+              onClick={handleFinalize}
+              disabled={isPending}
+              className="w-full rounded-full bg-[#2563eb] px-5 py-3 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
+            >
+              Angebot finalisieren
+            </button>
+          )}
+
+          {(status === "final" || status === "signed") && (
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-[#64748b]">Link für den Kunden</span>
+              <input
+                readOnly
+                value={`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/q/${quote.share_token}`}
+                onFocus={(e) => e.target.select()}
+                className="font-mono w-full rounded-xl border border-[#e9edf2] bg-[#f8fafc] px-3 py-2 text-xs text-[#0f172a]"
+              />
+            </label>
+          )}
+
+          <a
+            href={`/quotes/${quote.id}/pdf`}
+            download
+            className="w-full rounded-xl border border-[#e9edf2] bg-white px-5 py-2.5 text-center text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f8fafc]"
+          >
+            Als PDF herunterladen
+          </a>
+
+          {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
+        </div>
+      </div>
     </div>
   );
 }
