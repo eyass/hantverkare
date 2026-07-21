@@ -104,6 +104,87 @@ export async function updateLineItem(
   return { error: null, lineItems: allItems, totals };
 }
 
+type InvoiceRow = {
+  id: string;
+  invoice_number: string;
+  issued_at: string;
+  subtotal_cents: number;
+  vat_cents: number;
+  total_cents: number;
+};
+
+type CreateInvoiceResult =
+  | { error: string; invoice?: never }
+  | { error: null; invoice: InvoiceRow };
+
+export async function createInvoice(quoteId: string): Promise<CreateInvoiceResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("status, subtotal_cents, vat_cents, total_cents")
+    .eq("id", quoteId)
+    .single();
+  if (!quote || quote.status !== "signed") {
+    return { error: "Nur signierte Angebote können in Rechnung gestellt werden." };
+  }
+
+  const { data: existingInvoice } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+    .eq("quote_id", quoteId)
+    .maybeSingle();
+  if (existingInvoice) {
+    return { error: null, invoice: existingInvoice };
+  }
+
+  const { data: invoiceNumber, error: rpcError } = await supabase.rpc("next_invoice_number", {
+    p_user_id: user.id,
+  });
+  if (rpcError || !invoiceNumber) {
+    console.error("Failed to generate invoice number:", rpcError);
+    return { error: "Rechnungsnummer konnte nicht erzeugt werden." };
+  }
+
+  const { data: invoice, error: insertError } = await supabase
+    .from("invoices")
+    .insert({
+      user_id: user.id,
+      quote_id: quoteId,
+      invoice_number: invoiceNumber,
+      subtotal_cents: quote.subtotal_cents,
+      vat_cents: quote.vat_cents,
+      total_cents: quote.total_cents,
+    })
+    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+    .single();
+
+  if (insertError) {
+    // Likely lost a double-click race against unique (quote_id): another request
+    // already created the invoice between our pre-check and this insert. Return the
+    // now-existing invoice instead of surfacing an error.
+    const { data: raceWinner } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+      .eq("quote_id", quoteId)
+      .maybeSingle();
+    if (raceWinner) {
+      return { error: null, invoice: raceWinner };
+    }
+    console.error("Failed to create invoice:", insertError);
+    return { error: "Rechnung konnte nicht erstellt werden." };
+  }
+
+  return { error: null, invoice };
+}
+
 export async function finalizeQuote(quoteId: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
 
