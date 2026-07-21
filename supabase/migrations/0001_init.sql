@@ -23,3 +23,5 @@ create policy "Users can update their own profile"
 
 -- No delete policy: RLS denies by default. Add one explicitly if a
 -- "delete my account" feature needs it later.
+
+-- smoke-test comment only, no schema change — verifying T3 routing
