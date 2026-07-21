@@ -48,15 +48,15 @@ export default async function ReportsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Auswertung</h1>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <h1 className="text-2xl font-semibold text-[#0f172a]">Auswertung</h1>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {tiles.map((tile) => (
           <div
             key={tile.label}
-            className="flex flex-col gap-1 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+            className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4"
           >
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">{tile.label}</span>
-            <span className="text-2xl font-semibold">{tile.value}</span>
+            <span className="font-mono text-2xl font-bold text-[#0f172a]">{tile.value}</span>
+            <span className="text-sm text-[#64748b]">{tile.label}</span>
           </div>
         ))}
       </div>
