@@ -128,3 +128,18 @@
     @apply font-sans;
   }
 }
+
+@keyframes voice-orb-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.voice-orb-ring {
+  animation: voice-orb-ring 1.8s ease-out infinite;
+}
