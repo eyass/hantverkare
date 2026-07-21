@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
   createCustomer,
@@ -145,12 +146,17 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
                 />
               </td>
               <td className="py-2">
-                <button
-                  onClick={() => handleDelete(customer.id)}
-                  className="text-red-600 underline"
-                >
-                  Löschen
-                </button>
+                <div className="flex items-center gap-3">
+                  <Link href={`/customers/${customer.id}`} className="underline">
+                    Verlauf
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(customer.id)}
+                    className="text-red-600 underline"
+                  >
+                    Löschen
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
