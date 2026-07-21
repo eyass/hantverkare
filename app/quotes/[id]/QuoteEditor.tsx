@@ -28,6 +28,7 @@ function formatEuros(cents: number): string {
 
 export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: LineItem[] }) {
   const [items, setItems] = useState(lineItems);
+  const [lastSavedItems, setLastSavedItems] = useState(lineItems);
   const [totals, setTotals] = useState({
     subtotalCents: quote.subtotal_cents,
     vatCents: quote.vat_cents,
@@ -65,10 +66,14 @@ export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: Lin
       });
       if (result.error !== null) {
         setError(result.error);
+        setItems((prev) =>
+          prev.map((i) => (i.id === item.id ? (lastSavedItems.find((saved) => saved.id === item.id) ?? i) : i)),
+        );
         return;
       }
       setError(null);
       setItems(result.lineItems);
+      setLastSavedItems(result.lineItems);
       setTotals(result.totals);
     });
   }
@@ -129,7 +134,7 @@ export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: Lin
                   value={item.unit_price_cents / 100}
                   disabled={!isDraft}
                   onChange={(e) =>
-                    handleFieldChange(item.id, "unit_price_cents", String(Number(e.target.value) * 100))
+                    handleFieldChange(item.id, "unit_price_cents", String(Math.round(Number(e.target.value) * 100)))
                   }
                   onBlur={() => handleBlurSave(item)}
                   className="w-24 bg-transparent disabled:opacity-70"

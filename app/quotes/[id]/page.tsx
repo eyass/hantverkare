@@ -13,11 +13,15 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     .single();
   if (!quote) notFound();
 
-  const { data: lineItems } = await supabase
+  const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
     .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
     .eq("quote_id", id)
     .order("position");
+  if (lineItemsError) {
+    console.error("Failed to load line items for quote", id, lineItemsError);
+    notFound();
+  }
 
   return <QuoteEditor quote={quote} lineItems={lineItems ?? []} />;
 }

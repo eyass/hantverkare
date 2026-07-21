@@ -33,7 +33,7 @@ export async function updateLineItem(
   lineItemId: string,
   input: UpdateLineItemInput,
 ): Promise<UpdateLineItemResult> {
-  if (input.quantity <= 0 || input.unitPriceCents <= 0) {
+  if (input.quantity <= 0 || input.unitPriceCents <= 0 || !Number.isInteger(input.unitPriceCents)) {
     return { error: "Menge und Preis müssen größer als 0 sein." };
   }
 
@@ -107,21 +107,15 @@ export async function updateLineItem(
 export async function finalizeQuote(quoteId: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
 
-  const { data: quote } = await supabase
-    .from("quotes")
-    .select("status")
-    .eq("id", quoteId)
-    .single();
-  if (!quote || quote.status !== "draft") {
-    return { error: "Angebot ist bereits final." };
-  }
-
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("quotes")
     .update({ status: "final", finalized_at: new Date().toISOString() })
-    .eq("id", quoteId);
-  if (error) {
-    return { error: "Angebot konnte nicht finalisiert werden." };
+    .eq("id", quoteId)
+    .eq("status", "draft")
+    .select("id");
+  if (error || !data || data.length === 0) {
+    console.error("Failed to finalize quote:", error);
+    return { error: "Angebot ist bereits final." };
   }
 
   return { error: null };
