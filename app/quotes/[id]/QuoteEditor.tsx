@@ -20,7 +20,14 @@ type Quote = {
   subtotal_cents: number;
   vat_cents: number;
   total_cents: number;
+  share_token: string;
 };
+
+function statusLabel(status: string): string {
+  if (status === "final") return "(final)";
+  if (status === "signed") return "(signiert)";
+  return "(Entwurf)";
+}
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -92,8 +99,19 @@ export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: Lin
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Angebot {status === "final" ? "(final)" : "(Entwurf)"}</h1>
+      <h1 className="text-2xl font-semibold">Angebot {statusLabel(status)}</h1>
       <p className="text-zinc-600 dark:text-zinc-400">{quote.customer_description}</p>
+      {(status === "final" || status === "signed") && (
+        <label className="flex flex-col gap-1 text-sm">
+          Link für den Kunden
+          <input
+            readOnly
+            value={`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/q/${quote.share_token}`}
+            onFocus={(e) => e.target.select()}
+            className="rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700"
+          />
+        </label>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <table className="w-full border-collapse text-left text-sm">
         <thead>
