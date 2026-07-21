@@ -20,7 +20,11 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
     return () => {
       stopTimer();
       stopStream();
-      mediaRecorderRef.current?.stop();
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.ondataavailable = null;
+        mediaRecorderRef.current.stop();
+      }
     };
   }, []);
 
