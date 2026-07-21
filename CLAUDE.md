@@ -2,7 +2,10 @@
 
 # hantverkare — Claude Code guide
 
-A home-services / tradesperson marketplace (Bliqat-style clone).
+A clone of [Bliqat](https://bliqat.com/) for the German market: an AI-powered quoting
+tool for Handwerker (tradespeople) — describe a job, get a priced quote in under a
+minute, customer signs, invoice follows. Not a marketplace — no browsing/matching of
+providers, it's a solo-operator/small-business admin tool.
 
 ## How we work: the Loop
 **Every change follows `.harness/LOOP.md`.** Assign a risk tier from

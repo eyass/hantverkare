@@ -18,7 +18,7 @@ export async function createClient() {
             );
           } catch {
             // Called from a Server Component, where cookies can't be mutated.
-            // TODO: add middleware.ts to refresh sessions before real auth ships.
+            // Safe to ignore: proxy.ts refreshes the session on every request.
           }
         },
       },
