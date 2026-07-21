@@ -16,8 +16,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-[#f4f6f8] text-[#64748b]",
-  final: "bg-[#dbeafe] text-[#2563eb]",
+  draft: "bg-zinc-100 text-zinc-600",
+  final: "bg-blue-50 text-blue-700",
   signed: "bg-[#dcfce7] text-[#16a34a]",
 };
 
