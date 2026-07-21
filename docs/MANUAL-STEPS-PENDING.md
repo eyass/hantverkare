@@ -195,3 +195,24 @@ but you should eyeball these once you're back:
   settings (once filled in) in the letterhead
 - [ ] `/reports` — stat tiles show sensible numbers, "–" shown correctly with zero
   quotes/signed quotes
+
+## Design-system restyle (Phase A + B, merged) — visual QA needed
+
+The whole app was restyled to match `docs/DESIGN-SYSTEM.md` (dark sidebar shell,
+card-based layouts, pill status badges, voice-capture "orb"). All logic was verified
+unchanged via code review and `npm test`/`npm run build`, but no live browser pass was
+possible (same email rate-limit blocker as above). Please eyeball:
+
+- [ ] Desktop sidebar + mobile bottom tabs (`components/AppShell.tsx`) — nav highlighting,
+  sign-out, on a real small screen (not just resized browser)
+- [ ] `/quotes` — new stat tiles (Alle/Entwürfe/Final+Signiert) show correct counts
+  regardless of which status-filter tab is active (fixed a bug where tiles previously
+  reflected the *filtered* count instead of the full set)
+- [ ] `/quotes/new` — voice orb pulsing-ring animation while recording, on both
+  desktop and mobile, with an actual microphone
+- [ ] `/quotes/[id]` — two-column layout on desktop, single column on mobile; sticky
+  summary card behavior when scrolling a long line-item list
+- [ ] `/q/[token]` — dark customer-facing page background, white card contrast, on a
+  phone screen (this is the page real customers see)
+- [ ] `/settings`, `/customers`, `/customers/[id]`, `/price-list` — card styling,
+  delete-button visibility/contrast
