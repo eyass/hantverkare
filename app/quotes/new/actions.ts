@@ -97,3 +97,45 @@ export async function generateQuoteDraft(
 
   redirect(`/quotes/${quote.id}`);
 }
+
+export type TranscribeResult = { error: string; text?: never } | { error: null; text: string };
+
+export async function transcribeAudio(formData: FormData): Promise<TranscribeResult> {
+  const audio = formData.get("audio");
+  if (!(audio instanceof Blob) || audio.size === 0) {
+    return { error: "Keine Aufnahme empfangen." };
+  }
+
+  const whisperFormData = new FormData();
+  whisperFormData.set("file", audio, "recording.webm");
+  whisperFormData.set("model", "whisper-1");
+  whisperFormData.set("language", "de");
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: whisperFormData,
+    });
+  } catch (err) {
+    console.error("Whisper API request failed:", err);
+    return { error: "Transkription fehlgeschlagen. Bitte versuche es erneut." };
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("Whisper API error:", response.status, errorBody);
+    return { error: "Transkription fehlgeschlagen. Bitte versuche es erneut." };
+  }
+
+  const data = await response.json();
+  const text = typeof data.text === "string" ? data.text.trim() : "";
+  if (text.length === 0) {
+    return { error: "Keine Sprache erkannt, bitte erneut versuchen." };
+  }
+
+  return { error: null, text };
+}
