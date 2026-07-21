@@ -17,7 +17,8 @@ export async function createClient() {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // called from a Server Component — safe to ignore when middleware refreshes sessions
+            // Called from a Server Component, where cookies can't be mutated.
+            // TODO: add middleware.ts to refresh sessions before real auth ships.
           }
         },
       },
