@@ -97,3 +97,76 @@ export async function generateQuoteDraft(
 
   redirect(`/quotes/${quote.id}`);
 }
+
+export type TranscribeResult = { error: string; text?: never } | { error: null; text: string };
+
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+
+export async function transcribeAudio(formData: FormData): Promise<TranscribeResult> {
+  const audio = formData.get("audio");
+  if (!(audio instanceof Blob) || audio.size === 0) {
+    return { error: "Keine Aufnahme empfangen." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  if (audio.size > MAX_AUDIO_BYTES) {
+    return { error: "Aufnahme ist zu groß." };
+  }
+
+  const whisperFormData = new FormData();
+  whisperFormData.set("file", audio, "recording.webm");
+  whisperFormData.set("model", "whisper-1");
+  whisperFormData.set("language", "de");
+
+  let response: Response;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    try {
+      response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: whisperFormData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (err) {
+    console.error("Whisper API request failed:", err);
+    return { error: "Transkription fehlgeschlagen. Bitte versuche es erneut." };
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("Whisper API error:", response.status, errorBody);
+    return { error: "Transkription fehlgeschlagen. Bitte versuche es erneut." };
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch (err) {
+    console.error("Failed to parse Whisper API response:", err);
+    return { error: "Transkription fehlgeschlagen. Bitte versuche es erneut." };
+  }
+
+  const text =
+    typeof data === "object" && data !== null && "text" in data && typeof (data as { text: unknown }).text === "string"
+      ? (data as { text: string }).text.trim()
+      : "";
+  if (text.length === 0) {
+    return { error: "Keine Sprache erkannt, bitte erneut versuchen." };
+  }
+
+  return { error: null, text };
+}
