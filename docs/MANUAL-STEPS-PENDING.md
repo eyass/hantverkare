@@ -3,6 +3,17 @@
 Running list of things only you can do, accumulated while working through the backlog
 autonomously. Nothing here blocks progress — each item is noted and work continues.
 
+## Backlog complete
+
+Every tracked backlog item is now merged to `main`: AI quote generation, real auth,
+voice-to-text capture, business settings, customer records, e-signature, quote-customer
+linking, notifications, reporting, PDF export, invoicing, the full design-system restyle,
+Stripe SaaS billing (#19), and multi-user/team accounts (#15, the last item, done last
+on purpose since it changed the ownership model everything else assumed). Nothing is
+left running in the background. **The items below are the only work remaining, and all
+of it requires you** — migrations to run, secrets to add, and QA to eyeball. Once you've
+worked through this list the app is fully live.
+
 ## Migrations to apply in the Supabase SQL editor
 
 Run these **in order** (0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010) — later
