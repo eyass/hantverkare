@@ -8,15 +8,16 @@ export type BillingState = {
 };
 
 /**
- * Ensures the signed-in user has a billing row with a subscription_status
- * set, starting their 14-day free trial on first touch.
+ * Ensures the organization has a billing row with a subscription_status set,
+ * starting its 14-day free trial on first touch. Billing is per-organization
+ * (one subscription covers the whole team), not per-user -- see 0010.
  *
- * billing has no client-writable RLS policy (see 0009_billing.sql) -- writes
- * only happen here and from the Stripe webhook, both server-side, both using
- * the service-role client. `userId` here always comes from the caller's own
- * verified session (app/(app)/layout.tsx's supabase.auth.getUser()), never
- * from client input, so bypassing RLS is safe: a user can only ever have
- * their own trial started.
+ * billing has no client-writable RLS policy (see 0009/0010) -- writes only
+ * happen here and from the Stripe webhook, both server-side, both using the
+ * service-role client. `organizationId` here always comes from the caller's
+ * server-resolved membership (app/(app)/layout.tsx via ensureOrganization),
+ * never from client input, so bypassing RLS is safe: a user can only ever
+ * start a trial for their own org.
  *
  * We hook this into the authenticated (app) layout rather than a settings
  * page's own creation path because a billing row isn't otherwise guaranteed
@@ -31,13 +32,13 @@ export type BillingState = {
  * request -- both would attempt the insert, the second fails on the primary
  * key conflict and is treated as "trial already exists" by refetching.
  */
-export async function ensureTrialStarted(userId: string): Promise<BillingState> {
+export async function ensureTrialStarted(organizationId: string): Promise<BillingState> {
   const admin = createAdminClient();
 
   const { data: existing, error: fetchError } = await admin
     .from("billing")
     .select("subscription_status, trial_ends_at")
-    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
   if (fetchError) {
@@ -54,7 +55,7 @@ export async function ensureTrialStarted(userId: string): Promise<BillingState> 
 
   const trialEndsAt = new Date(Date.now() + TRIAL_LENGTH_MS).toISOString();
   const { error: insertError } = await admin.from("billing").insert({
-    user_id: userId,
+    organization_id: organizationId,
     subscription_status: "trialing",
     trial_ends_at: trialEndsAt,
   });
@@ -65,7 +66,7 @@ export async function ensureTrialStarted(userId: string): Promise<BillingState> 
       const { data: winner } = await admin
         .from("billing")
         .select("subscription_status, trial_ends_at")
-        .eq("user_id", userId)
+        .eq("organization_id", organizationId)
         .maybeSingle();
       if (winner) {
         return { subscriptionStatus: winner.subscription_status, trialEndsAt: winner.trial_ends_at };

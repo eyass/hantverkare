@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 
 type UpdateLineItemInput = {
@@ -127,6 +128,11 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
     return { error: "Bitte melde dich an." };
   }
 
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
   const { data: quote } = await supabase
     .from("quotes")
     .select("status, subtotal_cents, vat_cents, total_cents")
@@ -154,6 +160,7 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
   const { data: invoice, error: insertError } = await supabase
     .from("invoices")
     .insert({
+      organization_id: org.organizationId,
       user_id: user.id,
       quote_id: quoteId,
       invoice_number: invoiceNumber,

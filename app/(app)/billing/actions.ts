@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/stripe/client";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { canViewBilling } from "@/lib/organizations/permissions";
 
 /**
  * Creates a Stripe Checkout session for the €29/month subscription and
@@ -19,6 +21,13 @@ export async function createCheckoutSession(): Promise<void> {
     redirect("/login");
   }
 
+  // Billing is per-organization and owner-only. Enforced server-side: a member
+  // must never be able to start/manage the org's subscription.
+  const org = await getCurrentOrg(supabase);
+  if (!org || !canViewBilling(org.role)) {
+    throw new Error("Nur der Inhaber kann das Abonnement verwalten.");
+  }
+
   const priceId = process.env.STRIPE_PRICE_ID;
   if (!priceId) {
     throw new Error("STRIPE_PRICE_ID is not set.");
@@ -27,7 +36,7 @@ export async function createCheckoutSession(): Promise<void> {
   const { data: settings } = await supabase
     .from("billing")
     .select("stripe_customer_id")
-    .eq("user_id", user.id)
+    .eq("organization_id", org.organizationId)
     .maybeSingle();
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -37,12 +46,12 @@ export async function createCheckoutSession(): Promise<void> {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     customer: settings?.stripe_customer_id ?? undefined,
-    client_reference_id: user.id,
+    client_reference_id: org.organizationId,
     customer_email: settings?.stripe_customer_id ? undefined : (user.email ?? undefined),
     success_url: `${siteUrl}/billing?checkout=success`,
     cancel_url: `${siteUrl}/billing?checkout=cancelled`,
-    metadata: { user_id: user.id },
-    subscription_data: { metadata: { user_id: user.id } },
+    metadata: { organization_id: org.organizationId },
+    subscription_data: { metadata: { organization_id: org.organizationId } },
   });
 
   if (!session.url) {
@@ -66,10 +75,15 @@ export async function createBillingPortalSession(): Promise<void> {
     redirect("/login");
   }
 
+  const org = await getCurrentOrg(supabase);
+  if (!org || !canViewBilling(org.role)) {
+    throw new Error("Nur der Inhaber kann das Abonnement verwalten.");
+  }
+
   const { data: settings } = await supabase
     .from("billing")
     .select("stripe_customer_id")
-    .eq("user_id", user.id)
+    .eq("organization_id", org.organizationId)
     .maybeSingle();
 
   if (!settings?.stripe_customer_id) {
