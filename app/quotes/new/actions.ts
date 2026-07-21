@@ -15,12 +15,16 @@ export async function generateQuoteDraft(
   if (typeof description !== "string" || description.trim().length === 0) {
     return { error: "Bitte beschreibe den Auftrag." };
   }
+  if (description.length > 2000) {
+    return { error: "Die Beschreibung ist zu lang (max. 2000 Zeichen)." };
+  }
 
   const supabase = await createClient();
   const { data: priceList, error: priceListError } = await supabase
     .from("price_list_items")
     .select("label, unit, unit_price_cents, category");
   if (priceListError || !priceList) {
+    console.error("Failed to load price list:", priceListError);
     return { error: "Preisliste konnte nicht geladen werden." };
   }
 
@@ -37,6 +41,7 @@ export async function generateQuoteDraft(
     );
   } catch (err) {
     if (err instanceof QuoteGenerationError) {
+      console.error("Quote generation failed:", err);
       return { error: `Angebot konnte nicht erstellt werden: ${err.message}` };
     }
     throw err;
@@ -57,6 +62,7 @@ export async function generateQuoteDraft(
     .select("id")
     .single();
   if (quoteError || !quote) {
+    console.error("Failed to insert quote:", quoteError);
     return { error: "Angebot konnte nicht gespeichert werden." };
   }
 
@@ -72,6 +78,8 @@ export async function generateQuoteDraft(
     })),
   );
   if (lineItemsError) {
+    console.error("Failed to insert line items:", lineItemsError);
+    await supabase.from("quotes").delete().eq("id", quote.id);
     return { error: "Positionen konnten nicht gespeichert werden." };
   }
 
