@@ -386,6 +386,7 @@ begin
     into v_org_id
     from public.organization_members om
    where om.user_id = v_user_id
+   order by om.created_at asc
    limit 1;
 
   if v_org_id is null then

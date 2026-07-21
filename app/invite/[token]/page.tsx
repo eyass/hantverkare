@@ -86,6 +86,34 @@ export default async function InvitePage({
     .eq("user_id", user.id)
     .maybeSingle();
 
+  // This app assumes exactly one organization per user (no org switcher, no
+  // multi-org UI -- see docs/superpowers/specs/2026-07-22-multi-user-teams-design.md).
+  // Accepting a second invite while already belonging to a different org would
+  // silently create an inconsistent multi-membership state (e.g. getCurrentOrg()
+  // and next_invoice_number() could then resolve to different orgs for the same
+  // user). Block it here rather than allowing that state to exist at all.
+  if (!existingMembership) {
+    const { data: anyMembership } = await admin
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (anyMembership && anyMembership.organization_id !== invite.organization_id) {
+      return (
+        <Shell>
+          <h1 className="text-xl font-semibold text-[#0f172a]">Bereits in einem Unternehmen</h1>
+          <p className="mt-4 text-sm text-[#64748b]">
+            Dein Konto ({user.email}) gehört bereits zu einem anderen Unternehmen.
+            Ein Konto kann derzeit nur einem Unternehmen angehören. Bitte melde
+            dich mit einer anderen E-Mail-Adresse an, um dieser Einladung zu
+            folgen.
+          </p>
+        </Shell>
+      );
+    }
+  }
+
   if (!existingMembership) {
     const { error: memberError } = await admin
       .from("organization_members")
