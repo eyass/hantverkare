@@ -12,6 +12,7 @@ function formatDate(iso: string): string {
 const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",
   final: "Final",
+  signed: "Signiert",
 };
 
 export default async function QuotesPage({
@@ -35,7 +36,14 @@ export default async function QuotesPage({
     console.error("Failed to load quotes:", error);
   }
 
-  const allQuotes = quotes ?? [];
+  const { data: allStatuses, error: statusesError } = await supabase
+    .from("quotes")
+    .select("status");
+  if (statusesError) {
+    console.error("Failed to load quote status counts:", statusesError);
+  }
+
+  const allQuotes = allStatuses ?? [];
   const totalCount = allQuotes.length;
   const draftCount = allQuotes.filter((q) => q.status === "draft").length;
   const finalSignedCount = allQuotes.filter(
