@@ -11,9 +11,21 @@ export type BusinessSettingsInput = {
 
 type ActionResult = { error: string | null };
 
+const MAX_FIELD_LENGTH = 500;
+
+function normalize(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
 export async function saveBusinessSettings(
   input: BusinessSettingsInput,
 ): Promise<ActionResult> {
+  const fields = [input.companyName, input.address, input.vatId, input.taxNumber];
+  if (fields.some((field) => field.length > MAX_FIELD_LENGTH)) {
+    return { error: `Eingabe zu lang (max. ${MAX_FIELD_LENGTH} Zeichen pro Feld).` };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,10 +37,10 @@ export async function saveBusinessSettings(
   const { error } = await supabase.from("business_settings").upsert(
     {
       user_id: user.id,
-      company_name: input.companyName || null,
-      address: input.address || null,
-      vat_id: input.vatId || null,
-      tax_number: input.taxNumber || null,
+      company_name: normalize(input.companyName),
+      address: normalize(input.address),
+      vat_id: normalize(input.vatId),
+      tax_number: normalize(input.taxNumber),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
