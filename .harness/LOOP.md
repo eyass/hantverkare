@@ -31,10 +31,17 @@ Phases: ① SCOPE → ② BUILD → ③ VERIFY → ④ SHIP. Two human gates, bo
    finishing option to use (skip the "merge locally / PR / keep as-is / discard" prompt).
    Only skip this default if the human explicitly says to keep the branch as-is or discard it.
 2. Open a PR (skill: `ship`). The PR body must state the risk tier and check the gate list.
-3. **GATE (tiered):**
+3. **GATE (tiered) — currently overridden, see below.** The tiered gate as originally
+   designed:
    - **T1:** auto-merge once CI is green and the preview looks right.
    - **T2:** human async review + approve.
    - **T3:** explicit human approval, plus a separate deploy approval.
+
+   **Standing override (in effect until the human says otherwise):** auto-merge
+   T1, T2, and T3 alike once CI is green — do not stop and ask for merge approval
+   at any tier. This does NOT relax the SCOPE-phase plan-approval gate for T2/T3
+   (§SCOPE step 4 still applies), only the SHIP-phase merge gate. Revert to the
+   tiered gate above the moment the human says to.
 3. Merge and verify production (skill: `land-and-deploy`).
 4. Watch the deploy (skill: `canary`) for console errors / regressions.
 
