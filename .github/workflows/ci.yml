@@ -15,6 +15,7 @@ jobs:
       ANTHROPIC_API_KEY: dummy-key-for-ci
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
       OPENAI_API_KEY: dummy-key-for-ci
+      RESEND_API_KEY: dummy-key-for-ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

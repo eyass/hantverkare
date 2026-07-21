@@ -19,6 +19,12 @@ export async function generateQuoteDraft(
     return { error: "Die Beschreibung ist zu lang (max. 2000 Zeichen)." };
   }
 
+  const customerIdRaw = formData.get("customerId");
+  const customerId =
+    typeof customerIdRaw === "string" && customerIdRaw.trim().length > 0
+      ? customerIdRaw
+      : null;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -69,6 +75,7 @@ export async function generateQuoteDraft(
       vat_cents: totals.vatCents,
       total_cents: totals.totalCents,
       user_id: user.id,
+      customer_id: customerId,
     })
     .select("id")
     .single();
