@@ -20,12 +20,22 @@ export async function generateQuoteDraft(
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
   const { data: priceList, error: priceListError } = await supabase
     .from("price_list_items")
     .select("label, unit, unit_price_cents, category");
   if (priceListError || !priceList) {
     console.error("Failed to load price list:", priceListError);
     return { error: "Preisliste konnte nicht geladen werden." };
+  }
+  if (priceList.length === 0) {
+    return { error: "Bitte lege zuerst Preislistenpositionen an." };
   }
 
   let lineItems;
@@ -58,6 +68,7 @@ export async function generateQuoteDraft(
       subtotal_cents: totals.subtotalCents,
       vat_cents: totals.vatCents,
       total_cents: totals.totalCents,
+      user_id: user.id,
     })
     .select("id")
     .single();
@@ -75,6 +86,7 @@ export async function generateQuoteDraft(
       unit_price_cents: item.unitPriceCents,
       line_total_cents: item.lineTotalCents,
       position: index,
+      user_id: user.id,
     })),
   );
   if (lineItemsError) {
