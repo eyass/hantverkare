@@ -5,8 +5,8 @@ autonomously. Nothing here blocks progress — each item is noted and work conti
 
 ## Migrations to apply in the Supabase SQL editor
 
-Run these **in order** (0004 → 0005 → 0006 → 0007 → 0008) — later ones reference
-earlier tables/columns.
+Run these **in order** (0004 → 0005 → 0006 → 0007 → 0008 → 0009) — later ones
+reference earlier tables/columns.
 
 ### `0004_business_settings.sql`
 ```sql
@@ -156,6 +156,42 @@ create policy "Users can insert their own invoices"
   on public.invoices for insert
   with check (auth.uid() = user_id);
 ```
+
+### `0009_billing.sql`
+```sql
+alter table public.business_settings
+  add column stripe_customer_id text,
+  add column stripe_subscription_id text,
+  add column subscription_status text,
+  add column trial_ends_at timestamptz;
+```
+
+## Stripe SaaS billing (T3 / financial) — human setup required
+
+The app now gates access behind a subscription (14-day free trial, then
+29 €/month), matching Bliqat's model. **No agent has created a real Stripe
+account, a live Price object, or executed a real charge** — all code paths use
+Stripe test mode only. To make billing actually work end-to-end, you (a human)
+need to:
+
+- [ ] Create a Stripe account at [stripe.com](https://stripe.com) if you don't have
+  one yet (or use an existing one).
+- [ ] Stay in **test mode** (toggle in the Stripe Dashboard) for all of dev/staging.
+- [ ] Create a recurring Price: Products → Add product → recurring, €29.00/month.
+  Copy its Price ID (starts with `price_`).
+- [ ] Developers → API keys (test mode) → copy the **Secret key** (starts with
+  `sk_test_` — never use a `sk_live_` key in this app's env vars).
+- [ ] Developers → Webhooks → Add endpoint → URL `https://<your-domain>/api/stripe/webhook`
+  (or use the Stripe CLI's `stripe listen --forward-to localhost:3000/api/stripe/webhook`
+  for local dev) → select events `checkout.session.completed`,
+  `customer.subscription.updated`, `customer.subscription.deleted` → copy the
+  **Signing secret** (starts with `whsec_`).
+- [ ] Add these to `.env.local` and to Vercel (Preview + Production env vars):
+  - [ ] `STRIPE_SECRET_KEY` (test mode secret key)
+  - [ ] `STRIPE_WEBHOOK_SECRET` (webhook signing secret)
+  - [ ] `STRIPE_PRICE_ID` (the €29/month Price ID)
+- [ ] Once ready to accept real payments, switch to live-mode keys/Price/webhook
+  yourself -- this is an explicit, deliberate step no agent will take.
 
 ## Secrets to add (Vercel env vars + `.env.local`)
 
