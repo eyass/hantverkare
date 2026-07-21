@@ -145,9 +145,7 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
     return { error: null, invoice: existingInvoice };
   }
 
-  const { data: invoiceNumber, error: rpcError } = await supabase.rpc("next_invoice_number", {
-    p_user_id: user.id,
-  });
+  const { data: invoiceNumber, error: rpcError } = await supabase.rpc("next_invoice_number");
   if (rpcError || !invoiceNumber) {
     console.error("Failed to generate invoice number:", rpcError);
     return { error: "Rechnungsnummer konnte nicht erzeugt werden." };
