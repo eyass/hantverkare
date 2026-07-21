@@ -35,69 +35,122 @@ export default async function QuotesPage({
     console.error("Failed to load quotes:", error);
   }
 
+  const allQuotes = quotes ?? [];
+  const totalCount = allQuotes.length;
+  const draftCount = allQuotes.filter((q) => q.status === "draft").length;
+  const finalSignedCount = allQuotes.filter(
+    (q) => q.status === "final" || q.status === "signed",
+  ).length;
+
+  const statusBadgeClasses: Record<string, string> = {
+    draft: "bg-zinc-100 text-zinc-600",
+    final: "bg-blue-50 text-blue-700",
+    signed: "bg-[#dcfce7] text-[#16a34a]",
+  };
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Angebote</h1>
+        <h1 className="text-2xl font-semibold text-[#0f172a]">Angebote</h1>
         <Link
           href="/quotes/new"
-          className="rounded-full bg-foreground px-5 py-3 text-sm text-background"
+          className="rounded-full bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)]"
         >
           Neues Angebot
         </Link>
       </div>
-      <div className="flex gap-4 text-sm">
-        <Link href="/quotes" className={statusFilter === null ? "font-semibold underline" : "underline"}>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
+          <span className="font-mono text-2xl font-bold text-[#0f172a]">{totalCount}</span>
+          <span className="text-sm text-[#64748b]">Alle Angebote</span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
+          <span className="font-mono text-2xl font-bold text-[#0f172a]">{draftCount}</span>
+          <span className="text-sm text-[#64748b]">Entwürfe</span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
+          <span className="font-mono text-2xl font-bold text-[#0f172a]">{finalSignedCount}</span>
+          <span className="text-sm text-[#64748b]">Final/Signiert</span>
+        </div>
+      </div>
+
+      <div className="flex w-fit gap-1 rounded-full border border-[#e9edf2] bg-white p-1 text-sm">
+        <Link
+          href="/quotes"
+          className={
+            statusFilter === null
+              ? "rounded-full bg-[#2563eb] px-4 py-1.5 font-semibold text-white"
+              : "rounded-full px-4 py-1.5 text-[#64748b]"
+          }
+        >
           Alle
         </Link>
         <Link
           href="/quotes?status=draft"
-          className={statusFilter === "draft" ? "font-semibold underline" : "underline"}
+          className={
+            statusFilter === "draft"
+              ? "rounded-full bg-[#2563eb] px-4 py-1.5 font-semibold text-white"
+              : "rounded-full px-4 py-1.5 text-[#64748b]"
+          }
         >
           Entwürfe
         </Link>
         <Link
           href="/quotes?status=final"
-          className={statusFilter === "final" ? "font-semibold underline" : "underline"}
+          className={
+            statusFilter === "final"
+              ? "rounded-full bg-[#2563eb] px-4 py-1.5 font-semibold text-white"
+              : "rounded-full px-4 py-1.5 text-[#64748b]"
+          }
         >
           Final
         </Link>
       </div>
+
       {!quotes || quotes.length === 0 ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-[#64748b]">
           Noch keine Angebote vorhanden.{" "}
-          <Link href="/quotes/new" className="underline">
+          <Link href="/quotes/new" className="text-[#2563eb] underline">
             Jetzt erstellen
           </Link>
           .
         </p>
       ) : (
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-zinc-300 dark:border-zinc-700">
-              <th className="py-2">Beschreibung</th>
-              <th className="py-2">Status</th>
-              <th className="py-2">Gesamt</th>
-              <th className="py-2">Erstellt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotes.map((quote) => (
-              <tr key={quote.id} className="border-b border-zinc-200 dark:border-zinc-800">
-                <td className="py-2">
-                  <Link href={`/quotes/${quote.id}`} className="underline">
-                    {quote.customer_description.length > 60
-                      ? `${quote.customer_description.slice(0, 60)}…`
-                      : quote.customer_description}
-                  </Link>
-                </td>
-                <td className="py-2">{STATUS_LABELS[quote.status] ?? quote.status}</td>
-                <td className="py-2">{formatEuros(quote.total_cents)}</td>
-                <td className="py-2">{formatDate(quote.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
+          {quotes.map((quote, index) => (
+            <Link
+              key={quote.id}
+              href={`/quotes/${quote.id}`}
+              className={`flex items-center justify-between gap-4 p-4 transition-colors hover:bg-[#f4f6f8] ${
+                index !== 0 ? "border-t border-[#e9edf2]" : ""
+              }`}
+            >
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-[#0f172a]">
+                  {quote.customer_description.length > 60
+                    ? `${quote.customer_description.slice(0, 60)}…`
+                    : quote.customer_description}
+                </span>
+                <span className="font-mono text-xs text-[#94a3b8]">
+                  {formatDate(quote.created_at)}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    statusBadgeClasses[quote.status] ?? "bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {STATUS_LABELS[quote.status] ?? quote.status}
+                </span>
+                <span className="font-mono text-sm font-semibold text-[#0f172a]">
+                  {formatEuros(quote.total_cents)}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
     </div>
   );
