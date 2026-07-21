@@ -1,6 +1,10 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/logout/actions";
 import { AppShell } from "@/components/AppShell";
+import { ensureTrialStarted } from "@/lib/billing/ensureTrial";
+import { shouldGateAccess } from "@/lib/billing/gating";
 
 export default async function AuthenticatedLayout({
   children,
@@ -19,6 +23,23 @@ export default async function AuthenticatedLayout({
   // next request.
   if (!user) {
     return children;
+  }
+
+  // Stripe subscription gate. /billing must always be reachable -- otherwise a
+  // gated user could never reach the page that lets them subscribe -- so we
+  // read the current pathname (forwarded by proxy.ts as `x-pathname`, since
+  // Server Components have no direct pathname API) and skip the redirect
+  // there.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const isBillingRoute = pathname === "/billing" || pathname.startsWith("/billing/");
+
+  const billingState = await ensureTrialStarted(user.id);
+
+  if (!isBillingRoute && shouldGateAccess({
+    subscriptionStatus: billingState.subscriptionStatus,
+    trialEndsAt: billingState.trialEndsAt,
+  })) {
+    redirect("/billing");
   }
 
   return (
