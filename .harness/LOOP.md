@@ -13,10 +13,11 @@ Phases: ① SCOPE → ② BUILD → ③ VERIFY → ④ SHIP. Two human gates, bo
 
 ## ② BUILD
 1. Create a feature branch: `git checkout -b <type>/<slug>` (type = feat|fix|chore).
-2. Implement in small, atomic commits.
-3. Push: `git push -u origin HEAD`.
-4. CI runs the Core gates (lint · typecheck · build · secret scan). Vercel builds a preview.
-5. If CI is red: fix and repush. Each red→fix cycle counts toward the retry cap (see below).
+2. Execute the plan with **`superpowers:subagent-driven-development`** by default — don't ask which execution mode to use. Only fall back to `superpowers:executing-plans` if the human explicitly asks for a parallel/separate session instead.
+3. Implement in small, atomic commits.
+4. Push: `git push -u origin HEAD`.
+5. CI runs the Core gates (lint · typecheck · build · secret scan). Vercel builds a preview.
+6. If CI is red: fix and repush. Each red→fix cycle counts toward the retry cap (see below).
 
 ## ③ VERIFY
 1. Run automated review on the diff (skill: `review`, or `superpowers:code-reviewer`).
