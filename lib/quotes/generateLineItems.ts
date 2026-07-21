@@ -57,13 +57,17 @@ export function parseLineItemsToolInput(input: unknown): LineItem[] {
       typeof (raw as Record<string, unknown>).description !== "string" ||
       typeof (raw as Record<string, unknown>).quantity !== "number" ||
       typeof (raw as Record<string, unknown>).unit !== "string" ||
-      typeof (raw as Record<string, unknown>).unitPriceCents !== "number"
+      typeof (raw as Record<string, unknown>).unitPriceCents !== "number" ||
+      !Number.isInteger((raw as Record<string, unknown>).unitPriceCents)
     ) {
       throw new QuoteGenerationError(`Malformed line item at index ${index}`);
     }
 
     const item = raw as LineItem;
-    if (item.quantity <= 0 || item.unitPriceCents <= 0) {
+    if (
+      !Number.isFinite(item.quantity) || item.quantity <= 0 ||
+      !Number.isFinite(item.unitPriceCents) || item.unitPriceCents <= 0
+    ) {
       throw new QuoteGenerationError(`Invalid quantity or price at index ${index}`);
     }
     return item;
@@ -103,7 +107,9 @@ export async function generateLineItems(
       messages: [{ role: "user", content: buildPrompt(description, priceList) }],
     });
   } catch (err) {
-    throw new QuoteGenerationError(`Anthropic API call failed: ${(err as Error).message}`);
+    throw new QuoteGenerationError(`Anthropic API call failed: ${(err as Error).message}`, {
+      cause: err,
+    });
   }
 
   const toolUse = response.content.find((block) => block.type === "tool_use");

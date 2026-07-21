@@ -39,4 +39,43 @@ describe("parseLineItemsToolInput", () => {
     };
     expect(() => parseLineItemsToolInput(input)).toThrow(QuoteGenerationError);
   });
+
+  it("throws when quantity is NaN", () => {
+    const input = {
+      lineItems: [{ description: "Test", quantity: NaN, unit: "Stück", unitPriceCents: 1000 }],
+    };
+    expect(() => parseLineItemsToolInput(input)).toThrow(QuoteGenerationError);
+  });
+
+  it("throws when quantity is Infinity", () => {
+    const input = {
+      lineItems: [
+        { description: "Test", quantity: Infinity, unit: "Stück", unitPriceCents: 1000 },
+      ],
+    };
+    expect(() => parseLineItemsToolInput(input)).toThrow(QuoteGenerationError);
+  });
+
+  it("throws when unitPriceCents is NaN", () => {
+    const input = {
+      lineItems: [{ description: "Test", quantity: 1, unit: "Stück", unitPriceCents: NaN }],
+    };
+    expect(() => parseLineItemsToolInput(input)).toThrow(QuoteGenerationError);
+  });
+
+  it("throws when unitPriceCents is Infinity", () => {
+    const input = {
+      lineItems: [
+        { description: "Test", quantity: 1, unit: "Stück", unitPriceCents: Infinity },
+      ],
+    };
+    expect(() => parseLineItemsToolInput(input)).toThrow(QuoteGenerationError);
+  });
+
+  it("throws when unitPriceCents is not an integer", () => {
+    const input = {
+      lineItems: [{ description: "Test", quantity: 1, unit: "Stück", unitPriceCents: 99.5 }],
+    };
+    expect(() => parseLineItemsToolInput(input)).toThrow(QuoteGenerationError);
+  });
 });
