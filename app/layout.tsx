@@ -42,8 +42,14 @@ export default async function RootLayout({
               <Link href="/quotes" className="underline">
                 Angebote
               </Link>
+              <Link href="/customers" className="underline">
+                Kunden
+              </Link>
               <Link href="/price-list" className="underline">
                 Preisliste
+              </Link>
+              <Link href="/settings" className="underline">
+                Einstellungen
               </Link>
             </nav>
             <div className="flex items-center gap-4">
