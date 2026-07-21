@@ -8,7 +8,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const { data: quote } = await supabase
     .from("quotes")
-    .select("id, customer_description, status, subtotal_cents, vat_cents, total_cents")
+    .select("id, customer_description, status, subtotal_cents, vat_cents, total_cents, share_token")
     .eq("id", id)
     .single();
   if (!quote) notFound();
