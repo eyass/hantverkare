@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/logout/actions";
@@ -37,12 +38,22 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         {user && (
           <header className="flex items-center justify-between border-b border-zinc-200 px-8 py-3 text-sm dark:border-zinc-800">
-            <span className="text-zinc-600 dark:text-zinc-400">{user.email}</span>
-            <form action={signOut}>
-              <button type="submit" className="underline">
-                Abmelden
-              </button>
-            </form>
+            <nav className="flex items-center gap-4">
+              <Link href="/quotes" className="underline">
+                Angebote
+              </Link>
+              <Link href="/price-list" className="underline">
+                Preisliste
+              </Link>
+            </nav>
+            <div className="flex items-center gap-4">
+              <span className="text-zinc-600 dark:text-zinc-400">{user.email}</span>
+              <form action={signOut}>
+                <button type="submit" className="underline">
+                  Abmelden
+                </button>
+              </form>
+            </div>
           </header>
         )}
         {children}
