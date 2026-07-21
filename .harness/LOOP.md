@@ -6,10 +6,24 @@ full loop by reading this file plus `RISK-TIERS.md`.
 Phases: ① SCOPE → ② BUILD → ③ VERIFY → ④ SHIP. Two human gates, both risk-tiered.
 
 ## ① SCOPE
-1. For anything non-trivial, brainstorm the change (skill: `superpowers:brainstorming`).
+1. For anything non-trivial, brainstorm the change (skill: `superpowers:brainstorming`), but
+   **standing override (in effect until the human says otherwise): make every design/scope
+   decision autonomously.** Don't use clarifying questions or an approval prompt — pick the
+   most sensible default at each decision point, write the reasoning into the spec as you
+   would a clarifying-question answer, and move straight to writing the plan. This applies
+   to every choice during BUILD/VERIFY/SHIP too (execution mode, finishing option, merge —
+   all already defaulted elsewhere in this file). The only things that still require the
+   human's explicit go-ahead are the categories that can never be delegated regardless of
+   this override: entering financial/account credentials, executing a real financial
+   transaction or purchase, permanently deleting data, and anything else in the assistant's
+   own hard-coded "prohibited" and "explicit permission required" action categories (sending
+   messages/publishing on the human's behalf, changing external account settings, etc. —
+   those still get a quick heads-up even under this override, per the assistant's own rules).
 2. Assign a risk tier using `RISK-TIERS.md`.
 3. For T2/T3, write a plan (skill: `superpowers:writing-plans`).
-4. **GATE (T2/T3 only):** present the plan and wait for the human's approval before coding.
+4. **GATE (T2/T3 only) — suspended under the standing override above.** As originally
+   designed: present the plan and wait for the human's approval before coding. Revert the
+   moment the human asks.
 
 ## ② BUILD
 1. Create a feature branch: `git checkout -b <type>/<slug>` (type = feat|fix|chore).
