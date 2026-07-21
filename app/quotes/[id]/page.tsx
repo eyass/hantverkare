@@ -23,5 +23,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     notFound();
   }
 
-  return <QuoteEditor quote={quote} lineItems={lineItems ?? []} />;
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+    .eq("quote_id", id)
+    .maybeSingle();
+
+  return <QuoteEditor quote={quote} lineItems={lineItems ?? []} invoice={invoice ?? null} />;
 }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote } from "./actions";
+import { InvoiceSection } from "./InvoiceSection";
 
 type LineItem = {
   id: string;
@@ -23,6 +24,15 @@ type Quote = {
   share_token: string;
 };
 
+type Invoice = {
+  id: string;
+  invoice_number: string;
+  issued_at: string;
+  subtotal_cents: number;
+  vat_cents: number;
+  total_cents: number;
+};
+
 function statusLabel(status: string): string {
   if (status === "final") return "(final)";
   if (status === "signed") return "(signiert)";
@@ -33,7 +43,15 @@ function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 }
 
-export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: LineItem[] }) {
+export function QuoteEditor({
+  quote,
+  lineItems,
+  invoice,
+}: {
+  quote: Quote;
+  lineItems: LineItem[];
+  invoice: Invoice | null;
+}) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
   const [totals, setTotals] = useState({
@@ -184,6 +202,7 @@ export function QuoteEditor({ quote, lineItems }: { quote: Quote; lineItems: Lin
           Angebot finalisieren
         </button>
       )}
+      {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
     </div>
   );
 }
