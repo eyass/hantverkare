@@ -8,12 +8,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: quote } = await supabase
+  const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select("id, customer_description, subtotal_cents, vat_cents, total_cents, created_at")
     .eq("id", id)
     .maybeSingle();
 
+  if (quoteError) {
+    console.error("Failed to load quote for PDF", id, quoteError);
+  }
   if (!quote) {
     return new Response("Not found", { status: 404 });
   }
@@ -37,13 +40,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     console.error("Failed to load business settings for quote PDF", id, businessSettingsError);
   }
 
-  const buffer = await renderToBuffer(
-    <QuotePdfDocument
-      quote={quote}
-      lineItems={(lineItems ?? []) as PdfLineItem[]}
-      businessSettings={businessSettings ?? null}
-    />,
-  );
+  let buffer: Buffer;
+  try {
+    buffer = await renderToBuffer(
+      <QuotePdfDocument
+        quote={quote}
+        lineItems={(lineItems ?? []) as PdfLineItem[]}
+        businessSettings={businessSettings ?? null}
+      />,
+    );
+  } catch (err) {
+    console.error("Failed to render quote PDF", id, err);
+    return new Response("PDF konnte nicht erstellt werden.", { status: 500 });
+  }
 
   return new Response(new Uint8Array(buffer), {
     headers: {
