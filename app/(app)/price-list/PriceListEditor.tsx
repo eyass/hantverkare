@@ -20,6 +20,9 @@ function centsToEuroString(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+const inputClass =
+  "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-[#0f172a] outline-none transition-colors focus:border-[#e9edf2] focus:bg-[#f4f6f8]";
+
 export function PriceListEditor({ items: initialItems }: { items: PriceListItem[] }) {
   const [items, setItems] = useState(initialItems);
   const [lastSavedItems, setLastSavedItems] = useState(initialItems);
@@ -98,102 +101,107 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Preisliste</h1>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <table className="w-full border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-300 dark:border-zinc-700">
-            <th className="py-2">Bezeichnung</th>
-            <th className="py-2">Einheit</th>
-            <th className="py-2">Preis (EUR)</th>
-            <th className="py-2">Kategorie</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id} className="border-b border-zinc-200 dark:border-zinc-800">
-              <td className="py-2">
-                <input
-                  value={item.label}
-                  onChange={(e) => handleFieldChange(item.id, "label", e.target.value)}
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-full bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  value={item.unit}
-                  onChange={(e) => handleFieldChange(item.id, "unit", e.target.value)}
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-24 bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  type="number"
-                  value={centsToEuroString(item.unit_price_cents)}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      item.id,
-                      "unit_price_cents",
-                      String(Math.round(Number(e.target.value) * 100)),
-                    )
-                  }
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-24 bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  value={item.category}
-                  onChange={(e) => handleFieldChange(item.id, "category", e.target.value)}
-                  onBlur={() => handleBlurSave(item)}
-                  className="w-32 bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <button onClick={() => handleDelete(item.id)} className="text-red-600 underline">
-                  Löschen
-                </button>
-              </td>
+      <h1 className="text-2xl font-semibold text-[#0f172a]">Preisliste</h1>
+      {error && <p className="text-sm text-[#dc2626]">{error}</p>}
+      <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-[#e9edf2] text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+              <th className="px-4 py-3">Bezeichnung</th>
+              <th className="px-4 py-3">Einheit</th>
+              <th className="px-4 py-3">Preis (EUR)</th>
+              <th className="px-4 py-3">Kategorie</th>
+              <th className="px-4 py-3"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="flex flex-col gap-2 border-t border-zinc-300 pt-4 dark:border-zinc-700">
-        <h2 className="text-lg font-medium">Neue Position</h2>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
+                <td className="px-4 py-2">
+                  <input
+                    value={item.label}
+                    onChange={(e) => handleFieldChange(item.id, "label", e.target.value)}
+                    onBlur={() => handleBlurSave(item)}
+                    className={inputClass}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    value={item.unit}
+                    onChange={(e) => handleFieldChange(item.id, "unit", e.target.value)}
+                    onBlur={() => handleBlurSave(item)}
+                    className={`w-24 ${inputClass}`}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    type="number"
+                    value={centsToEuroString(item.unit_price_cents)}
+                    onChange={(e) =>
+                      handleFieldChange(
+                        item.id,
+                        "unit_price_cents",
+                        String(Math.round(Number(e.target.value) * 100)),
+                      )
+                    }
+                    onBlur={() => handleBlurSave(item)}
+                    className={`w-24 font-mono ${inputClass}`}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    value={item.category}
+                    onChange={(e) => handleFieldChange(item.id, "category", e.target.value)}
+                    onBlur={() => handleBlurSave(item)}
+                    className={`w-32 ${inputClass}`}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="text-sm font-medium text-[#dc2626] hover:text-[#b91c1c]"
+                  >
+                    Löschen
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Neue Position</h2>
         <div className="flex flex-wrap gap-2">
           <input
             value={newItem.label}
             onChange={(e) => setNewItem((prev) => ({ ...prev, label: e.target.value }))}
             placeholder="Bezeichnung"
-            className="flex-1 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newItem.unit}
             onChange={(e) => setNewItem((prev) => ({ ...prev, unit: e.target.value }))}
             placeholder="Einheit"
-            className="w-24 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-24 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             type="number"
             value={newItem.unitPrice}
             onChange={(e) => setNewItem((prev) => ({ ...prev, unitPrice: e.target.value }))}
             placeholder="Preis (EUR)"
-            className="w-28 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-28 rounded-xl border border-[#e9edf2] p-2.5 font-mono text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newItem.category}
             onChange={(e) => setNewItem((prev) => ({ ...prev, category: e.target.value }))}
             placeholder="Kategorie"
-            className="w-32 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-32 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
         </div>
         <button
           onClick={handleAdd}
           disabled={isPending}
-          className="self-start rounded-full bg-foreground px-5 py-3 text-background disabled:opacity-50"
+          className="self-start rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           Position hinzufügen
         </button>

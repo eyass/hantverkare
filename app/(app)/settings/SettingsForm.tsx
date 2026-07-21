@@ -44,63 +44,65 @@ export function SettingsForm({
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Unternehmensdaten</h1>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && !error && <p className="text-sm text-green-600">Gespeichert.</p>}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Firmenname
-          <input
-            value={companyName}
-            onChange={(e) => {
-              setCompanyName(e.target.value);
-              setSaved(false);
-            }}
-            className="rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Adresse
-          <textarea
-            value={address}
-            onChange={(e) => {
-              setAddress(e.target.value);
-              setSaved(false);
-            }}
-            rows={3}
-            className="rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          USt-IdNr.
-          <input
-            value={vatId}
-            onChange={(e) => {
-              setVatId(e.target.value);
-              setSaved(false);
-            }}
-            className="rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Steuernummer
-          <input
-            value={taxNumber}
-            onChange={(e) => {
-              setTaxNumber(e.target.value);
-              setSaved(false);
-            }}
-            className="rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="self-start rounded-full bg-foreground px-5 py-3 text-background disabled:opacity-50"
-        >
-          Speichern
-        </button>
-      </form>
+      <h1 className="text-2xl font-semibold text-[#0f172a]">Unternehmensdaten</h1>
+      <div className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+        {error && <p className="mb-4 text-sm text-[#dc2626]">{error}</p>}
+        {saved && !error && <p className="mb-4 text-sm text-[#16a34a]">Gespeichert.</p>}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[#0f172a]">
+            Firmenname
+            <input
+              value={companyName}
+              onChange={(e) => {
+                setCompanyName(e.target.value);
+                setSaved(false);
+              }}
+              className="rounded-xl border border-[#e9edf2] p-2.5 text-sm font-normal text-[#0f172a] outline-none focus:border-[#2563eb]"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[#0f172a]">
+            Adresse
+            <textarea
+              value={address}
+              onChange={(e) => {
+                setAddress(e.target.value);
+                setSaved(false);
+              }}
+              rows={3}
+              className="rounded-xl border border-[#e9edf2] p-2.5 text-sm font-normal text-[#0f172a] outline-none focus:border-[#2563eb]"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[#0f172a]">
+            USt-IdNr.
+            <input
+              value={vatId}
+              onChange={(e) => {
+                setVatId(e.target.value);
+                setSaved(false);
+              }}
+              className="rounded-xl border border-[#e9edf2] p-2.5 text-sm font-normal text-[#0f172a] outline-none focus:border-[#2563eb]"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[#0f172a]">
+            Steuernummer
+            <input
+              value={taxNumber}
+              onChange={(e) => {
+                setTaxNumber(e.target.value);
+                setSaved(false);
+              }}
+              className="rounded-xl border border-[#e9edf2] p-2.5 text-sm font-normal text-[#0f172a] outline-none focus:border-[#2563eb]"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="mt-2 self-start rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
+          >
+            Speichern
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

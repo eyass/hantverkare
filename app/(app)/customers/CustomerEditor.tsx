@@ -17,6 +17,9 @@ type Customer = {
   address: string | null;
 };
 
+const inputClass =
+  "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-[#0f172a] outline-none transition-colors focus:border-[#e9edf2] focus:bg-[#f4f6f8]";
+
 export function CustomerEditor({ customers: initialCustomers }: { customers: Customer[] }) {
   const [customers, setCustomers] = useState(initialCustomers);
   const [lastSavedCustomers, setLastSavedCustomers] = useState(initialCustomers);
@@ -98,102 +101,107 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Kunden</h1>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <table className="w-full border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-300 dark:border-zinc-700">
-            <th className="py-2">Name</th>
-            <th className="py-2">E-Mail</th>
-            <th className="py-2">Telefon</th>
-            <th className="py-2">Adresse</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {customers.map((customer) => (
-            <tr key={customer.id} className="border-b border-zinc-200 dark:border-zinc-800">
-              <td className="py-2">
-                <input
-                  value={customer.name}
-                  onChange={(e) => handleFieldChange(customer.id, "name", e.target.value)}
-                  onBlur={() => handleBlurSave(customer)}
-                  className="w-full bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  value={customer.email ?? ""}
-                  onChange={(e) => handleFieldChange(customer.id, "email", e.target.value)}
-                  onBlur={() => handleBlurSave(customer)}
-                  className="w-full bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  value={customer.phone ?? ""}
-                  onChange={(e) => handleFieldChange(customer.id, "phone", e.target.value)}
-                  onBlur={() => handleBlurSave(customer)}
-                  className="w-32 bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <input
-                  value={customer.address ?? ""}
-                  onChange={(e) => handleFieldChange(customer.id, "address", e.target.value)}
-                  onBlur={() => handleBlurSave(customer)}
-                  className="w-full bg-transparent"
-                />
-              </td>
-              <td className="py-2">
-                <div className="flex items-center gap-3">
-                  <Link href={`/customers/${customer.id}`} className="underline">
-                    Verlauf
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(customer.id)}
-                    className="text-red-600 underline"
-                  >
-                    Löschen
-                  </button>
-                </div>
-              </td>
+      <h1 className="text-2xl font-semibold text-[#0f172a]">Kunden</h1>
+      {error && <p className="text-sm text-[#dc2626]">{error}</p>}
+      <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-[#e9edf2] text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">E-Mail</th>
+              <th className="px-4 py-3">Telefon</th>
+              <th className="px-4 py-3">Adresse</th>
+              <th className="px-4 py-3"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="flex flex-col gap-2 border-t border-zinc-300 pt-4 dark:border-zinc-700">
-        <h2 className="text-lg font-medium">Neuer Kunde</h2>
+          </thead>
+          <tbody>
+            {customers.map((customer) => (
+              <tr key={customer.id} className="border-b border-[#e9edf2] last:border-b-0">
+                <td className="px-4 py-2">
+                  <input
+                    value={customer.name}
+                    onChange={(e) => handleFieldChange(customer.id, "name", e.target.value)}
+                    onBlur={() => handleBlurSave(customer)}
+                    className={inputClass}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    value={customer.email ?? ""}
+                    onChange={(e) => handleFieldChange(customer.id, "email", e.target.value)}
+                    onBlur={() => handleBlurSave(customer)}
+                    className={inputClass}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    value={customer.phone ?? ""}
+                    onChange={(e) => handleFieldChange(customer.id, "phone", e.target.value)}
+                    onBlur={() => handleBlurSave(customer)}
+                    className={`w-32 ${inputClass}`}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    value={customer.address ?? ""}
+                    onChange={(e) => handleFieldChange(customer.id, "address", e.target.value)}
+                    onBlur={() => handleBlurSave(customer)}
+                    className={inputClass}
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/customers/${customer.id}`}
+                      className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+                    >
+                      Verlauf
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(customer.id)}
+                      className="text-sm font-medium text-[#dc2626] hover:text-[#b91c1c]"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Neuer Kunde</h2>
         <div className="flex flex-wrap gap-2">
           <input
             value={newCustomer.name}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, name: e.target.value }))}
             placeholder="Name"
-            className="flex-1 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newCustomer.email}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, email: e.target.value }))}
             placeholder="E-Mail"
-            className="flex-1 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newCustomer.phone}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))}
             placeholder="Telefon"
-            className="w-32 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-32 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newCustomer.address}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, address: e.target.value }))}
             placeholder="Adresse"
-            className="flex-1 rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
         </div>
         <button
           onClick={handleAdd}
           disabled={isPending}
-          className="self-start rounded-full bg-foreground px-5 py-3 text-background disabled:opacity-50"
+          className="self-start rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           Kunde hinzufügen
         </button>
