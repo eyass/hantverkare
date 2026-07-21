@@ -48,6 +48,9 @@ export default async function RootLayout({
               <Link href="/price-list" className="underline">
                 Preisliste
               </Link>
+              <Link href="/reports" className="underline">
+                Berichte
+              </Link>
               <Link href="/settings" className="underline">
                 Einstellungen
               </Link>
