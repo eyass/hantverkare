@@ -9,7 +9,7 @@ type NavItem = {
   label: string;
 };
 
-const NAV_ITEMS: NavItem[] = [
+const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/quotes", label: "Angebote" },
   { href: "/customers", label: "Kunden" },
   { href: "/price-list", label: "Preisliste" },
@@ -17,20 +17,37 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/settings", label: "Einstellungen" },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+// Only owners manage the team; members never see the link (and the Server
+// Actions behind it enforce owner-only server-side regardless).
+const OWNER_NAV_ITEMS: NavItem[] = [{ href: "/settings/team", label: "Team" }];
+
+// The active item is the one whose href is the longest prefix of the current
+// path, so e.g. /settings/team highlights "Team" and not also "Einstellungen".
+function activeHref(pathname: string, items: NavItem[]): string | null {
+  const matches = items.filter(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+  if (matches.length === 0) return null;
+  return matches.reduce((best, item) =>
+    item.href.length > best.href.length ? item : best,
+  ).href;
 }
 
 export function AppShell({
   email,
+  role,
   signOutAction,
   children,
 }: {
   email: string;
+  role: "owner" | "member";
   signOutAction: () => Promise<void>;
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const NAV_ITEMS =
+    role === "owner" ? [...BASE_NAV_ITEMS, ...OWNER_NAV_ITEMS] : BASE_NAV_ITEMS;
+  const currentHref = activeHref(pathname, NAV_ITEMS);
 
   return (
     <div className="flex min-h-screen">
@@ -42,7 +59,7 @@ export function AppShell({
         </div>
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = item.href === currentHref;
             return (
               <Link
                 key={item.href}
@@ -78,7 +95,7 @@ export function AppShell({
         {/* Mobile bottom tabs */}
         <nav className="fixed inset-x-0 bottom-0 flex border-t border-[#e9edf2] bg-white px-2 py-2 md:hidden">
           {NAV_ITEMS.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = item.href === currentHref;
             return (
               <Link
                 key={item.href}
