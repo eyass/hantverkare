@@ -41,4 +41,10 @@ describe("shouldGateAccess", () => {
       shouldGateAccess({ subscriptionStatus: "past_due", trialEndsAt: future() }),
     ).toBe(true);
   });
+
+  it("gates an unrecognized status string (fail closed, allowlist not blocklist)", () => {
+    expect(
+      shouldGateAccess({ subscriptionStatus: "some_future_stripe_status", trialEndsAt: future() }),
+    ).toBe(true);
+  });
 });

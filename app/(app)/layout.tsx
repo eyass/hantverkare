@@ -33,7 +33,7 @@ export default async function AuthenticatedLayout({
   const pathname = (await headers()).get("x-pathname") ?? "";
   const isBillingRoute = pathname === "/billing" || pathname.startsWith("/billing/");
 
-  const billingState = await ensureTrialStarted(supabase, user.id);
+  const billingState = await ensureTrialStarted(user.id);
 
   if (!isBillingRoute && shouldGateAccess({
     subscriptionStatus: billingState.subscriptionStatus,

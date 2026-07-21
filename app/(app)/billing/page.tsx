@@ -18,7 +18,7 @@ export default async function BillingPage() {
 
   const { data: settings, error } = user
     ? await supabase
-        .from("business_settings")
+        .from("billing")
         .select("subscription_status, trial_ends_at, stripe_customer_id")
         .eq("user_id", user.id)
         .maybeSingle()

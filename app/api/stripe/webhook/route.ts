@@ -17,7 +17,7 @@ async function updateBusinessSettingsForSubscription(
 
   const supabase = createAdminClient();
   const { error } = await supabase
-    .from("business_settings")
+    .from("billing")
     .update({
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
@@ -26,7 +26,7 @@ async function updateBusinessSettingsForSubscription(
     .eq("user_id", userId);
 
   if (error) {
-    console.error("Failed to update business_settings from webhook:", error);
+    console.error("Failed to update billing from webhook:", error);
   }
 }
 
@@ -63,9 +63,9 @@ export async function POST(request: Request): Promise<Response> {
       }
 
       const supabase = createAdminClient();
-      const { error } = await supabase
-        .from("business_settings")
-        .update({
+      const { error } = await supabase.from("billing").upsert(
+        {
+          user_id: userId,
           stripe_customer_id:
             typeof session.customer === "string" ? session.customer : session.customer?.id,
           stripe_subscription_id:
@@ -74,11 +74,12 @@ export async function POST(request: Request): Promise<Response> {
               : session.subscription?.id,
           subscription_status: "active",
           updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
+        },
+        { onConflict: "user_id" },
+      );
 
       if (error) {
-        console.error("Failed to update business_settings after checkout:", error);
+        console.error("Failed to update billing after checkout:", error);
       }
       break;
     }

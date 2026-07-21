@@ -159,12 +159,28 @@ create policy "Users can insert their own invoices"
 
 ### `0009_billing.sql`
 ```sql
-alter table public.business_settings
-  add column stripe_customer_id text,
-  add column stripe_subscription_id text,
-  add column subscription_status text,
-  add column trial_ends_at timestamptz;
+create table public.billing (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  subscription_status text,
+  trial_ends_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.billing enable row level security;
+
+create policy "Users can view their own billing row"
+  on public.billing for select
+  using (auth.uid() = user_id);
 ```
+(Deliberately a separate table from `business_settings`, not new columns on it:
+`business_settings`'s existing update policy lets a user write any column on their
+own row from the client, which would let anyone PATCH their own
+`subscription_status` to `active` and bypass billing entirely. `billing` has no
+insert/update/delete policy for the `authenticated` role — only the webhook route,
+using the service-role client, can write to it.)
 
 ## Stripe SaaS billing (T3 / financial) — human setup required
 

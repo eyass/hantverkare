@@ -25,7 +25,7 @@ export async function createCheckoutSession(): Promise<void> {
   }
 
   const { data: settings } = await supabase
-    .from("business_settings")
+    .from("billing")
     .select("stripe_customer_id")
     .eq("user_id", user.id)
     .maybeSingle();
@@ -67,7 +67,7 @@ export async function createBillingPortalSession(): Promise<void> {
   }
 
   const { data: settings } = await supabase
-    .from("business_settings")
+    .from("billing")
     .select("stripe_customer_id")
     .eq("user_id", user.id)
     .maybeSingle();
