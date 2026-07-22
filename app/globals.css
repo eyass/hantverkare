@@ -143,3 +143,36 @@
 .voice-orb-ring {
   animation: voice-orb-ring 1.8s ease-out infinite;
 }
+
+/*
+ * Hero mount-in animation (badge / h1 / intro paragraph in PageHero).
+ * Plain CSS keyframes on purpose: this content is above-the-fold and must
+ * be visible immediately on load, with zero dependency on React state, JS
+ * timers, or animation-library internals (framer-motion's mount/animate
+ * lifecycle was found to get stuck at opacity:0 under certain conditions).
+ * A CSS animation always runs and always reaches its final `forwards`
+ * state, so it cannot get "stuck" the way a JS-driven approach can.
+ */
+@keyframes hero-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--hero-fade-offset, 16px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-fade-in {
+  animation: hero-fade-in-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--hero-fade-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

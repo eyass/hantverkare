@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { MarketingShell } from "@/components/MarketingShell";
+import { PageHero } from "@/components/marketing/PageHero";
+import { AnimatedSection } from "@/components/marketing/AnimatedSection";
 
 const FAQS = [
   {
@@ -47,42 +52,48 @@ const FAQS = [
 export default function FaqPage() {
   return (
     <MarketingShell>
-      <section className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-4 pt-16 pb-10 text-center sm:px-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
-          Häufig gestellte Fragen
-        </h1>
-        <p className="max-w-xl text-lg leading-8 text-[#64748b]">
-          Antworten auf die wichtigsten Fragen rund um hantverkare.
-        </p>
-      </section>
+      <PageHero
+        compact
+        title="Häufig gestellte Fragen"
+        description="Antworten auf die wichtigsten Fragen rund um hantverkare."
+      />
 
-      <section className="mx-auto max-w-3xl px-4 pb-16 sm:px-8">
+      <section className="mx-auto max-w-3xl px-4 py-16 sm:px-8">
         <div className="flex flex-col gap-4">
-          {FAQS.map((faq) => (
-            <details
-              key={faq.question}
-              className="group rounded-2xl border border-[#e9edf2] bg-white p-5 shadow-sm open:shadow-md"
-            >
-              <summary className="cursor-pointer list-none text-base font-medium text-[#0f172a] marker:content-none">
-                <span className="flex items-center justify-between gap-3">
-                  {faq.question}
-                  <span className="mono shrink-0 text-[#94a3b8] transition group-open:rotate-45">+</span>
-                </span>
-              </summary>
-              <p className="mt-3 text-sm leading-6 text-[#64748b]">{faq.answer}</p>
-            </details>
+          {FAQS.map((faq, index) => (
+            <AnimatedSection key={faq.question} delay={Math.min(index, 5) * 0.05}>
+              <motion.details
+                className="group rounded-2xl border border-[#e9edf2] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition open:shadow-[0_12px_28px_rgba(15,23,42,0.08)]"
+                whileHover={{ y: -2 }}
+                transition={{ duration: 0.2 }}
+              >
+                <summary className="cursor-pointer list-none text-base font-medium text-[#0f172a] marker:content-none">
+                  <span className="flex items-center justify-between gap-3">
+                    {faq.question}
+                    <span className="mono flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition group-open:rotate-45">
+                      +
+                    </span>
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm leading-6 text-[#64748b]">{faq.answer}</p>
+              </motion.details>
+            </AnimatedSection>
           ))}
         </div>
 
-        <div className="mt-10 flex flex-col items-center gap-3 rounded-2xl border border-[#e9edf2] bg-white p-6 text-center shadow-sm">
-          <p className="text-sm text-[#64748b]">Noch Fragen? Probier hantverkare einfach unverbindlich aus.</p>
-          <Link
-            href="/login"
-            className="rounded-full bg-[#2563eb] px-6 py-3 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition hover:bg-[#1d4ed8]"
-          >
-            Jetzt kostenlos starten
-          </Link>
-        </div>
+        <AnimatedSection className="mt-10">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#e9edf2] bg-[#f4f6f8] p-8 text-center">
+            <p className="text-sm text-[#64748b]">
+              Noch Fragen? Probier hantverkare einfach unverbindlich aus.
+            </p>
+            <Link
+              href="/login"
+              className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition hover:from-blue-400 hover:to-blue-600"
+            >
+              Jetzt kostenlos starten
+            </Link>
+          </div>
+        </AnimatedSection>
       </section>
     </MarketingShell>
   );
