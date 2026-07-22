@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingShell } from "@/components/MarketingShell";
 import { QuoteDemo } from "@/components/QuoteDemo";
@@ -29,6 +30,28 @@ const STATS = [
   { value: "14 Tage", label: "kostenlos & unverbindlich testen" },
   { value: "29 €/Monat", label: "danach, jederzeit kündbar" },
 ];
+
+const TITLE = "hantverkare — Angebote für Handwerker in unter einer Minute";
+const DESCRIPTION =
+  "KI-gestützte Angebotssoftware für Handwerksbetriebe: Auftrag per Sprache oder Text beschreiben, Angebot per Klick erstellen, Kunde unterschreibt digital, Rechnung folgt automatisch.";
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/",
+    siteName: "hantverkare",
+    locale: "de_DE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+};
 
 export default function Home() {
   return (

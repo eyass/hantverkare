@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingShell } from "@/components/MarketingShell";
 import { PageHero } from "@/components/marketing/PageHero";
@@ -57,6 +58,28 @@ const FLOW_STEPS = [
   "Kunde erhält einen Link und unterschreibt digital.",
   "Rechnung wird automatisch aus dem unterschriebenen Angebot erstellt.",
 ];
+
+const TITLE = "So funktioniert's: Vom Auftrag zum unterschriebenen Angebot";
+const DESCRIPTION =
+  "Sprachaufnahme wird zu Text, die KI kalkuliert Positionen aus deiner Preisliste, der Kunde unterschreibt digital, und die Rechnung wird automatisch erstellt.";
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/tool",
+    siteName: "hantverkare",
+    locale: "de_DE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+};
 
 export default function ToolPage() {
   return (

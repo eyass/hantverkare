@@ -15,8 +15,17 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://hantverkare.vercel.app"),
   title: "hantverkare",
   description: "KI-gestützte Angebote für Handwerker",
+  openGraph: {
+    siteName: "hantverkare",
+    locale: "de_DE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({
