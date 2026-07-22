@@ -1,6 +1,10 @@
 import type { LineItem, PricedLineItem, QuoteTotals } from "./types";
 
-const VAT_RATE = 0.19;
+// Exported so callers that need to freeze a total from raw line totals
+// without going through computeTotals' full recompute (e.g. the contract-
+// renewal cron duplicating a signed quote's amounts, app/api/cron/contract-renewal/route.ts)
+// can use the same rate instead of hardcoding a second copy of it.
+export const VAT_RATE = 0.19;
 
 export function priceLineItem(item: LineItem): PricedLineItem {
   return {
