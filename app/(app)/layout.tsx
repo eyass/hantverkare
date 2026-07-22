@@ -28,6 +28,36 @@ export default async function AuthenticatedLayout({
     return children;
   }
 
+  // Optional TOTP 2FA step-up gate. If this user has a verified TOTP factor
+  // enrolled, Supabase requires the session to reach aal2 (second factor)
+  // before it's fully authenticated -- a magic-link sign-in only ever grants
+  // aal1. `getAuthenticatorAssuranceLevel` reports both the session's
+  // currentLevel and the nextLevel it could step up to; when they differ,
+  // the user has an unmet step-up requirement and must be sent to the
+  // dedicated /mfa-challenge page (outside this layout group, so it renders
+  // without the app shell) before reaching ANY route under this layout --
+  // this is the sole enforcement point for the second factor, so it must
+  // run unconditionally here, before the billing gate below. Users with no
+  // enrolled factor see currentLevel === nextLevel === 'aal1' and are
+  // completely unaffected, per the feature being opt-in.
+  //
+  // This check must fail CLOSED: if the AAL lookup itself errors out (network
+  // blip, transient Supabase issue, rate limit, etc.) we cannot conclude the
+  // user has satisfied any step-up requirement, so we treat that the same as
+  // "must step up" rather than silently letting the request through. This is
+  // safe for users with no enrolled factor too: /mfa-challenge performs its
+  // own AAL check and immediately redirects them on to `next` when there's
+  // nothing to challenge (including on its own transient errors), so routing
+  // everyone through it here does not risk locking out non-MFA users.
+  const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aalError || !aal || aal.nextLevel !== aal.currentLevel) {
+    if (aalError) {
+      console.error("Failed to get authenticator assurance level:", aalError);
+    }
+    const pathnameForChallenge = (await headers()).get("x-pathname") ?? "/price-list";
+    redirect(`/mfa-challenge?next=${encodeURIComponent(pathnameForChallenge)}`);
+  }
+
   // Stripe subscription gate. /billing must always be reachable -- otherwise a
   // gated user could never reach the page that lets them subscribe -- so we
   // read the current pathname (forwarded by proxy.ts as `x-pathname`, since
