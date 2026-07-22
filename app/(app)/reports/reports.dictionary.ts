@@ -1,0 +1,57 @@
+import type { Dictionary } from "@/lib/i18n/dictionary";
+
+export type ReportsCopy = {
+  title: string;
+  tileTotalQuotes: string;
+  tileDraft: string;
+  tileFinal: string;
+  tileSigned: string;
+  tileConversionRate: string;
+  tileRevenue: string;
+  tileAvgSignedValue: string;
+  profitabilityTitle: string;
+  profitabilityEmpty: string;
+  profitabilityRevenue: string;
+  profitabilityCost: string;
+  profitabilityMargin: string;
+  profitabilityIncomplete: (withCost: number, total: number) => string;
+};
+
+export const REPORTS_DICTIONARY: Dictionary<ReportsCopy> = {
+  de: {
+    title: "Auswertung",
+    tileTotalQuotes: "Angebote insgesamt",
+    tileDraft: "Entwurf",
+    tileFinal: "Final",
+    tileSigned: "Signiert",
+    tileConversionRate: "Abschlussquote",
+    tileRevenue: "Umsatz (signiert)",
+    tileAvgSignedValue: "Ø Wert pro signiertem Angebot",
+    profitabilityTitle: "Profitabilität (intern)",
+    profitabilityEmpty:
+      "– Noch keine Kostendaten erfasst. Trage bei Angebotspositionen optional Kosten ein, um hier die Marge zu sehen.",
+    profitabilityRevenue: "Umsatz (mit Kostendaten)",
+    profitabilityCost: "Kosten",
+    profitabilityMargin: "Rohertrag",
+    profitabilityIncomplete: (withCost, total) =>
+      `Hinweis: Nicht für alle Positionen sind Kosten hinterlegt (${withCost} von ${total}). Die Marge oben bezieht sich nur auf Positionen mit erfassten Kosten.`,
+  },
+  en: {
+    title: "Reports",
+    tileTotalQuotes: "Total quotes",
+    tileDraft: "Draft",
+    tileFinal: "Final",
+    tileSigned: "Signed",
+    tileConversionRate: "Conversion rate",
+    tileRevenue: "Revenue (signed)",
+    tileAvgSignedValue: "Avg. value per signed quote",
+    profitabilityTitle: "Profitability (internal)",
+    profitabilityEmpty:
+      "– No cost data recorded yet. Optionally add costs on quote line items to see the margin here.",
+    profitabilityRevenue: "Revenue (with cost data)",
+    profitabilityCost: "Cost",
+    profitabilityMargin: "Gross margin",
+    profitabilityIncomplete: (withCost, total) =>
+      `Note: not all line items have cost data (${withCost} of ${total}). The margin above only reflects items with recorded costs.`,
+  },
+};
