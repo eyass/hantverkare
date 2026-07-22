@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateLineItem, finalizeQuote, assignQuote } from "./actions";
+import { updateLineItem, finalizeQuote, assignQuote, addSuggestedLineItem } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
 import { ContractSection } from "./ContractSection";
@@ -10,6 +10,7 @@ import type { ContractInterval } from "@/lib/contracts/interval";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { computeProfitability } from "@/lib/quotes/profitability";
 import { PhotosSection } from "./PhotosSection";
+import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
 
 type LineItem = {
@@ -31,6 +32,8 @@ type Quote = {
   vat_cents: number;
   total_cents: number;
   share_token: string;
+  gallery_token: string;
+  gallery_enabled: boolean;
   declined_at: string | null;
   decline_reason: string | null;
   assigned_to: string | null;
@@ -98,6 +101,14 @@ type Contract = {
   next_due_date: string;
 };
 
+type UpsellSuggestion = {
+  priceListItemId: string;
+  label: string;
+  unit: string;
+  unitPriceCents: number;
+  coOccurrenceCount: number;
+};
+
 export function QuoteEditor({
   quote,
   lineItems,
@@ -107,6 +118,7 @@ export function QuoteEditor({
   warranty,
   scheduledJob,
   members,
+  upsellSuggestions,
 }: {
   quote: Quote;
   lineItems: LineItem[];
@@ -116,6 +128,7 @@ export function QuoteEditor({
   warranty: WarrantyRecord | null;
   scheduledJob: ScheduledJob | null;
   members: Member[];
+  upsellSuggestions: UpsellSuggestion[];
 }) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
@@ -129,6 +142,8 @@ export function QuoteEditor({
   const [isPending, startTransition] = useTransition();
   const [assignedTo, setAssignedTo] = useState(quote.assigned_to);
   const [isAssignPending, startAssignTransition] = useTransition();
+  const [suggestions, setSuggestions] = useState(upsellSuggestions);
+  const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null);
   const isDraft = status === "draft";
   const displayStatus = computeQuoteDisplayStatus({ status, declinedAt: quote.declined_at });
   const profitability = computeProfitability(
@@ -192,6 +207,23 @@ export function QuoteEditor({
         return;
       }
       setError(null);
+    });
+  }
+
+  function handleAddSuggestion(suggestion: UpsellSuggestion) {
+    setAddingSuggestionId(suggestion.priceListItemId);
+    startTransition(async () => {
+      const result = await addSuggestedLineItem(quote.id, suggestion.priceListItemId);
+      setAddingSuggestionId(null);
+      if (result.error !== null) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setItems(result.lineItems);
+      setLastSavedItems(result.lineItems);
+      setTotals(result.totals);
+      setSuggestions((prev) => prev.filter((s) => s.priceListItemId !== suggestion.priceListItemId));
     });
   }
 
@@ -331,6 +363,36 @@ export function QuoteEditor({
               ))}
             </tbody>
           </table>
+          {isDraft && suggestions.length > 0 && (
+            <div className="flex flex-col gap-3 border-t border-[#e9edf2] bg-[#f8fafc] px-4 py-4">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+                Häufig dazu gebucht
+              </span>
+              <ul className="flex flex-col gap-2">
+                {suggestions.map((suggestion) => (
+                  <li
+                    key={suggestion.priceListItemId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#e9edf2] bg-white px-3 py-2 text-sm"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-[#0f172a]">{suggestion.label}</span>
+                      <span className="text-xs text-[#64748b]">
+                        {formatEuros(suggestion.unitPriceCents)} / {suggestion.unit}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddSuggestion(suggestion)}
+                      disabled={isPending}
+                      className="shrink-0 rounded-full border border-[#2563eb] px-3 py-1.5 text-xs font-medium text-[#2563eb] transition-colors hover:bg-[#eff6ff] disabled:opacity-50"
+                    >
+                      {addingSuggestionId === suggestion.priceListItemId ? "Wird hinzugefügt…" : "+ Hinzufügen"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Summary card */}
@@ -421,6 +483,13 @@ export function QuoteEditor({
         quoteId={quote.id}
         lineItems={items.map((item) => ({ id: item.id, description: item.description }))}
         photos={photos}
+      />
+
+      <GallerySection
+        quoteId={quote.id}
+        galleryToken={quote.gallery_token}
+        initialEnabled={quote.gallery_enabled}
+        hasPhotos={photos.length > 0}
       />
     </div>
   );
