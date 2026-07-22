@@ -7,7 +7,7 @@ import { generateLineItems, QuoteGenerationError } from "@/lib/quotes/generateLi
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { buildLineItemsFromTemplate } from "@/lib/quoteTemplates/templateBuilder";
 
-export type GenerateQuoteState = { error: string | null };
+export type GenerateQuoteState = { error: string | null; queuedOffline?: boolean };
 
 export async function generateQuoteDraft(
   _prevState: GenerateQuoteState,
