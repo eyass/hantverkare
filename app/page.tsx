@@ -64,18 +64,24 @@ export default function Home() {
         </div>
       </PageHero>
 
-      <AnimatedSection className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
-        <div className="grid gap-6 rounded-3xl border border-[#e9edf2] bg-[#f4f6f8] p-6 sm:grid-cols-3 sm:p-10">
-          {STATS.map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center gap-1 text-center">
-              <span className="mono text-2xl font-semibold text-[#0f172a] sm:text-3xl">
-                {stat.value}
-              </span>
-              <span className="text-sm text-[#64748b]">{stat.label}</span>
-            </div>
-          ))}
-        </div>
-      </AnimatedSection>
+      <section className="relative overflow-hidden bg-[#020617] py-10 sm:py-14">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.18),transparent_60%)]"
+        />
+        <AnimatedSection className="relative mx-auto max-w-6xl px-4 sm:px-8">
+          <div className="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur sm:grid-cols-3 sm:p-10">
+            {STATS.map((stat) => (
+              <div key={stat.label} className="flex flex-col items-center gap-1 text-center">
+                <span className="mono text-2xl font-semibold text-white sm:text-3xl">
+                  {stat.value}
+                </span>
+                <span className="text-sm text-slate-300">{stat.label}</span>
+              </div>
+            ))}
+          </div>
+        </AnimatedSection>
+      </section>
 
       <AnimatedSection className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-16 sm:px-8">
         <h2 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
