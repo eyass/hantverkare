@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { PriceListEditor } from "./PriceListEditor";
 import { createPriceListItemsFromTemplate } from "./actions";
 
@@ -32,8 +33,8 @@ export function PriceListWizard({ templates }: { templates: TemplateWithItems[] 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
-  const [applied, setApplied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function pickTemplate(template: TemplateWithItems) {
     setSelectedTemplate(template);
@@ -55,11 +56,11 @@ export function PriceListWizard({ templates }: { templates: TemplateWithItems[] 
         return;
       }
       setError(null);
-      setApplied(true);
+      router.refresh();
     });
   }
 
-  if (step === "blank" || applied) {
+  if (step === "blank") {
     return <PriceListEditor items={[]} />;
   }
 
