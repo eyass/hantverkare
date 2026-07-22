@@ -74,6 +74,7 @@ export default async function TeamSettingsPage() {
           membersCanDeleteCustomers: true,
           membersCanViewBilling: true,
           membersCanEditBusinessSettings: true,
+          smsNotificationsEnabled: false,
         }
       }
     />

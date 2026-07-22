@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSignedNotification } from "@/lib/notifications/sendSignedEmail";
 import { sendDeclinedNotification } from "@/lib/notifications/sendDeclinedEmail";
+import { sendSmsNotification, buildSignedSmsBody } from "@/lib/notifications/sendSmsNotification";
 
 type SignQuoteResult = { error: string | null };
 type DeclineQuoteResult = { error: string | null };
@@ -38,7 +39,7 @@ export async function signQuote(token: string, signerName: string): Promise<Sign
     .eq("share_token", token)
     .eq("status", "final")
     .is("declined_at", null)
-    .select("id, user_id, customer_description");
+    .select("id, user_id, customer_description, organization_id");
   if (error || !data || data.length === 0) {
     console.error("Failed to sign quote:", error);
     return { error: "Angebot konnte nicht unterschrieben werden. Es ist möglicherweise nicht mehr verfügbar." };
@@ -61,6 +62,27 @@ export async function signQuote(token: string, signerName: string): Promise<Sign
         quoteDescription: quote.customer_description ?? "",
         quoteId: quote.id,
       });
+    }
+
+    // Additional best-effort SMS, gated on the org's opt-in toggle (see
+    // organizations.sms_notifications_enabled, 0016_sms_notifications.sql)
+    // and on the owner actually having a phone number on file. Must never
+    // affect the result returned to the customer.
+    const ownerPhone = ownerData?.user?.phone;
+    if (ownerPhone) {
+      const { data: orgRow, error: orgError } = await supabase
+        .from("organizations")
+        .select("sms_notifications_enabled")
+        .eq("id", quote.organization_id)
+        .maybeSingle();
+      if (orgError) {
+        console.error("Failed to look up organization SMS setting:", orgError);
+      } else if (orgRow?.sms_notifications_enabled) {
+        await sendSmsNotification({
+          toPhone: ownerPhone,
+          body: buildSignedSmsBody(trimmedName, quote.customer_description ?? ""),
+        });
+      }
     }
   } catch (notifyErr) {
     console.error("Failed to send signed-quote notification:", notifyErr);

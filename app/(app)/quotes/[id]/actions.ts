@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
+import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 
 type UpdateLineItemInput = {
   description: string;
   quantity: number;
   unit: string;
   unitPriceCents: number;
+  costCents?: number | null;
 };
 
 type LineItemRow = {
@@ -18,6 +20,7 @@ type LineItemRow = {
   quantity: number;
   unit: string;
   unit_price_cents: number;
+  cost_cents: number | null;
   line_total_cents: number;
   position: number;
 };
@@ -37,6 +40,10 @@ export async function updateLineItem(
 ): Promise<UpdateLineItemResult> {
   if (input.quantity <= 0 || input.unitPriceCents <= 0 || !Number.isInteger(input.unitPriceCents)) {
     return { error: "Menge und Preis müssen größer als 0 sein." };
+  }
+  const costCents = input.costCents ?? null;
+  if (costCents !== null && (!Number.isInteger(costCents) || costCents < 0)) {
+    return { error: "Kosten müssen 0 oder größer sein." };
   }
 
   const supabase = await createClient();
@@ -64,6 +71,7 @@ export async function updateLineItem(
       quantity: priced.quantity,
       unit: priced.unit,
       unit_price_cents: priced.unitPriceCents,
+      cost_cents: costCents,
       line_total_cents: priced.lineTotalCents,
     })
     .eq("id", lineItemId)
@@ -74,7 +82,7 @@ export async function updateLineItem(
 
   const { data: allItems, error: fetchError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
+    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
     .eq("quote_id", quoteId)
     .order("position");
   if (fetchError || !allItems) {
@@ -208,6 +216,150 @@ export async function finalizeQuote(quoteId: string): Promise<{ error: string | 
   if (error || !data || data.length === 0) {
     console.error("Failed to finalize quote:", error);
     return { error: "Angebot ist bereits final." };
+  }
+
+  return { error: null };
+}
+
+type PhotoRow = {
+  id: string;
+  storage_path: string;
+  caption: string | null;
+  quote_line_item_id: string | null;
+  created_at: string;
+};
+
+type AddPhotoResult =
+  | { error: string; photo?: never }
+  | { error: null; photo: PhotoRow };
+
+/**
+ * Uploads a job-site photo to Storage and records it against a quote (and
+ * optionally one of its line items). Takes FormData rather than plain
+ * arguments because a File can only cross the server-action boundary via
+ * multipart form data.
+ *
+ * organization_id is NEVER taken from the client: it is resolved here via
+ * getCurrentOrg from the authenticated session, then used both to build the
+ * storage path prefix (which storage.objects RLS checks) and to stamp the
+ * quote_photos row (which table RLS checks). quoteId/lineItemId are
+ * client-supplied but are only ever used as filters against tables that are
+ * themselves org-scoped by RLS -- a request for another org's quote_id
+ * simply finds no row and errors out, it can't leak or attach to it.
+ */
+export async function addQuotePhoto(formData: FormData): Promise<AddPhotoResult> {
+  const quoteId = formData.get("quoteId");
+  const lineItemIdRaw = formData.get("lineItemId");
+  const captionRaw = formData.get("caption");
+  const file = formData.get("file");
+
+  if (typeof quoteId !== "string" || quoteId.length === 0) {
+    return { error: "Angebot fehlt." };
+  }
+  if (!(file instanceof File)) {
+    return { error: "Keine Datei ausgewählt." };
+  }
+  const lineItemId = typeof lineItemIdRaw === "string" && lineItemIdRaw.length > 0 ? lineItemIdRaw : null;
+  const caption = typeof captionRaw === "string" && captionRaw.trim().length > 0 ? captionRaw.trim() : null;
+
+  const validation = validatePhotoFile({ type: file.type, size: file.size });
+  if (!validation.ok) {
+    return { error: validation.error };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase.from("quotes").select("id").eq("id", quoteId).maybeSingle();
+  if (!quote) {
+    return { error: "Angebot nicht gefunden." };
+  }
+
+  if (lineItemId) {
+    const { data: lineItem } = await supabase
+      .from("quote_line_items")
+      .select("id")
+      .eq("id", lineItemId)
+      .eq("quote_id", quoteId)
+      .maybeSingle();
+    if (!lineItem) {
+      return { error: "Position nicht gefunden." };
+    }
+  }
+
+  const storagePath = buildPhotoStoragePath(org.organizationId, quoteId, file.name);
+
+  const { error: uploadError } = await supabase.storage
+    .from(QUOTE_PHOTOS_BUCKET)
+    .upload(storagePath, file, { contentType: file.type || undefined });
+  if (uploadError) {
+    console.error("Failed to upload quote photo:", uploadError);
+    return { error: "Foto konnte nicht hochgeladen werden." };
+  }
+
+  const { data: photo, error: insertError } = await supabase
+    .from("quote_photos")
+    .insert({
+      organization_id: org.organizationId,
+      quote_id: quoteId,
+      quote_line_item_id: lineItemId,
+      storage_path: storagePath,
+      caption,
+      created_by: user.id,
+    })
+    .select("id, storage_path, caption, quote_line_item_id, created_at")
+    .single();
+
+  if (insertError || !photo) {
+    console.error("Failed to save quote photo record:", insertError);
+    // Best-effort cleanup so a failed insert doesn't leave an orphaned object.
+    await supabase.storage.from(QUOTE_PHOTOS_BUCKET).remove([storagePath]);
+    return { error: "Foto konnte nicht gespeichert werden." };
+  }
+
+  return { error: null, photo };
+}
+
+/**
+ * Deletes a quote photo: removes the Storage object first, then the
+ * quote_photos row. The row lookup is filtered only by id -- RLS on
+ * quote_photos (is_org_member(organization_id)) is what actually prevents a
+ * user from deleting another org's photo, so a mismatched id simply returns
+ * no row here rather than needing an explicit org check.
+ */
+export async function deleteQuotePhoto(photoId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { data: photo } = await supabase
+    .from("quote_photos")
+    .select("id, storage_path")
+    .eq("id", photoId)
+    .maybeSingle();
+  if (!photo) {
+    return { error: "Foto nicht gefunden." };
+  }
+
+  const { error: storageError } = await supabase.storage.from(QUOTE_PHOTOS_BUCKET).remove([photo.storage_path]);
+  if (storageError) {
+    console.error("Failed to delete quote photo from storage:", storageError);
+    return { error: "Foto konnte nicht gelöscht werden." };
+  }
+
+  const { error: deleteError } = await supabase.from("quote_photos").delete().eq("id", photoId);
+  if (deleteError) {
+    console.error("Failed to delete quote photo record:", deleteError);
+    return { error: "Foto konnte nicht gelöscht werden." };
   }
 
   return { error: null };
