@@ -1,6 +1,12 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { computeProfitability } from "@/lib/quotes/profitability";
 import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
+import {
+  computeReportsDateRange,
+  isReportsRangePreset,
+  type ReportsRangePreset,
+} from "@/lib/reports/dateRange";
 import { REPORTS_DICTIONARY } from "./reports.dictionary";
 
 function formatEuros(cents: number): string {
@@ -11,9 +17,21 @@ function formatPercent(ratio: number): string {
   return ratio.toLocaleString("de-DE", { style: "percent", maximumFractionDigits: 1 });
 }
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+}) {
+  const { range, from, to } = await searchParams;
+  const preset: ReportsRangePreset = isReportsRangePreset(range) ? range : "this_month";
+  const dateRange = computeReportsDateRange(preset, from ?? null, to ?? null);
+
   const supabase = await createClient();
-  const { data: quotes, error } = await supabase.from("quotes").select("status, total_cents");
+  const { data: quotes, error } = await supabase
+    .from("quotes")
+    .select("status, total_cents")
+    .gte("created_at", dateRange.startISO)
+    .lt("created_at", dateRange.endISO);
   if (error) {
     console.error("Failed to load quotes for reports:", error);
   }
@@ -43,7 +61,9 @@ export default async function ReportsPage() {
   const { data: signedQuotes, error: signedQuotesError } = await supabase
     .from("quotes")
     .select("id")
-    .eq("status", "signed");
+    .eq("status", "signed")
+    .gte("created_at", dateRange.startISO)
+    .lt("created_at", dateRange.endISO);
   if (signedQuotesError) {
     console.error("Failed to load signed quotes for profitability:", signedQuotesError);
   }
@@ -82,9 +102,68 @@ export default async function ReportsPage() {
     },
   ];
 
+  const presetPills: { preset: ReportsRangePreset; label: string }[] = [
+    { preset: "this_month", label: t.rangeThisMonth },
+    { preset: "last_month", label: t.rangeLastMonth },
+    { preset: "this_quarter", label: t.rangeThisQuarter },
+    { preset: "this_year", label: t.rangeThisYear },
+    { preset: "custom", label: t.rangeCustom },
+  ];
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex w-fit flex-wrap gap-1 rounded-full border border-[#e9edf2] bg-white p-1 text-sm">
+          {presetPills.map((pill) => (
+            <Link
+              key={pill.preset}
+              href={pill.preset === "this_month" ? "/reports" : `/reports?range=${pill.preset}`}
+              className={
+                preset === pill.preset
+                  ? "rounded-full bg-[#2563eb] px-4 py-1.5 font-semibold text-white"
+                  : "rounded-full px-4 py-1.5 text-[#64748b]"
+              }
+            >
+              {pill.label}
+            </Link>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <form
+            method="get"
+            className="flex flex-wrap items-end gap-2 rounded-2xl border border-[#e9edf2] bg-white p-3"
+          >
+            <input type="hidden" name="range" value="custom" />
+            <label className="flex flex-col gap-1 text-xs text-[#64748b]">
+              {t.rangeCustomFrom}
+              <input
+                type="date"
+                name="from"
+                defaultValue={dateRange.customFrom ?? ""}
+                className="rounded-lg border border-[#e9edf2] px-2 py-1.5 text-sm text-[#0f172a]"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[#64748b]">
+              {t.rangeCustomTo}
+              <input
+                type="date"
+                name="to"
+                defaultValue={dateRange.customTo ?? ""}
+                className="rounded-lg border border-[#e9edf2] px-2 py-1.5 text-sm text-[#0f172a]"
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded-full bg-[#2563eb] px-4 py-1.5 text-sm font-semibold text-white"
+            >
+              {t.rangeCustomApply}
+            </button>
+          </form>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {tiles.map((tile) => (
           <div
