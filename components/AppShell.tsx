@@ -18,9 +18,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/settings", label: "Einstellungen" },
 ];
 
-// Only owners manage the team; members never see the link (and the Server
-// Actions behind it enforce owner-only server-side regardless).
-const OWNER_NAV_ITEMS: NavItem[] = [{ href: "/settings/team", label: "Team" }];
+// Only owners manage the team / danger zone; members never see these links
+// (and the Server Actions behind them enforce owner-only server-side
+// regardless).
+const OWNER_NAV_ITEMS: NavItem[] = [
+  { href: "/settings/team", label: "Team" },
+  { href: "/settings/danger-zone", label: "Danger Zone" },
+];
 
 // The active item is the one whose href is the longest prefix of the current
 // path, so e.g. /settings/team highlights "Team" and not also "Einstellungen".
