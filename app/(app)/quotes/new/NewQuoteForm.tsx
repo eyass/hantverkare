@@ -173,6 +173,14 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
   function persistDraft(patch: Partial<QuoteDraft>) {
     draftRef.current = { ...draftRef.current, ...patch };
     saveDraft(window.localStorage, draftRef.current);
+    // If a generation request is already queued (offline submission awaiting
+    // reconnect), keep its description in sync -- otherwise a note recorded
+    // or deleted after queuing would be silently dropped from the eventual
+    // submission, since the queue entry is a separate localStorage snapshot
+    // from the moment it was first queued.
+    if (queued && patch.description !== undefined) {
+      enqueueGeneration({ ...queued, description: patch.description });
+    }
   }
 
   // Keep a ref mirror of notes (for unmount cleanup) and revoke every note's
@@ -186,18 +194,39 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
     };
   }, []);
 
-  function applyDescription(nextNotes: VoiceNote[]) {
+  // Tracks the last description we auto-wrote into the textarea, so we can
+  // tell whether the craftsman has manually edited it since. If they have,
+  // recomputing the full join-of-all-notes on the next note add/delete would
+  // silently clobber their edit -- instead we append the new note onto
+  // whatever text is currently there, and leave deletions to just drop that
+  // note's own future contribution rather than rewriting the field.
+  const lastAppliedDescriptionRef = useRef("");
+
+  function applyDescription(nextNotes: VoiceNote[], newlyAddedText?: string) {
     const combined = nextNotes.map((note) => note.text).join("\n\n");
-    if (textareaRef.current) {
-      textareaRef.current.value = combined;
+    const current = textareaRef.current?.value ?? "";
+    const wasManuallyEdited = current !== lastAppliedDescriptionRef.current;
+
+    let result: string;
+    if (!wasManuallyEdited) {
+      result = combined;
+    } else if (newlyAddedText) {
+      result = current ? `${current}\n\n${newlyAddedText}` : newlyAddedText;
+    } else {
+      result = current;
     }
-    persistDraft({ description: combined });
+
+    if (textareaRef.current) {
+      textareaRef.current.value = result;
+    }
+    lastAppliedDescriptionRef.current = result;
+    persistDraft({ description: result });
   }
 
   function handleNoteRecorded(note: RecordedNote) {
     setNotes((prev) => {
       const next = [...prev, { id: nextNoteId(), ...note }];
-      applyDescription(next);
+      applyDescription(next, note.text);
       return next;
     });
   }
