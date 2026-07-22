@@ -8,6 +8,7 @@ export type QuoteTemplatesCopy = {
   colName: string;
   colItems: string;
   colCreated: string;
+  edit: string;
   delete: string;
 };
 
@@ -22,6 +23,7 @@ export const QUOTE_TEMPLATES_DICTIONARY: Dictionary<QuoteTemplatesCopy> = {
     colName: "Name",
     colItems: "Positionen",
     colCreated: "Erstellt",
+    edit: "Bearbeiten",
     delete: "Löschen",
   },
   en: {
@@ -33,6 +35,7 @@ export const QUOTE_TEMPLATES_DICTIONARY: Dictionary<QuoteTemplatesCopy> = {
     colName: "Name",
     colItems: "Items",
     colCreated: "Created",
+    edit: "Edit",
     delete: "Delete",
   },
 };

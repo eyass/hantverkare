@@ -7,6 +7,11 @@ import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 import { computeNextDueDate, isValidContractInterval, type ContractInterval } from "@/lib/contracts/interval";
+import {
+  computeUpsellSuggestions,
+  type HistoricalQuote,
+  type UpsellSuggestion,
+} from "@/lib/quotes/upsellSuggestions";
 
 type UpdateLineItemInput = {
   description: string;
@@ -573,4 +578,205 @@ export async function convertQuoteToContract(
   }
 
   return { error: null, contract };
+}
+
+/**
+ * Computes "commonly paired" price-list item suggestions for a draft quote
+ * (issue #159): items that, across the org's own past quotes, often appear
+ * alongside the items already added to this one.
+ *
+ * Read-only analysis of existing data -- no new schema needed. Only draws on
+ * the org's own historical quote_line_items (see
+ * lib/quotes/upsellSuggestions.ts for the co-occurrence logic and the
+ * "too little history" cutoff), never a static per-trade guess.
+ */
+export async function getUpsellSuggestions(quoteId: string): Promise<UpsellSuggestion[]> {
+  const supabase = await createClient();
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) return [];
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, status")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.status !== "draft") return [];
+
+  const { data: currentItems } = await supabase
+    .from("quote_line_items")
+    .select("price_list_item_id")
+    .eq("quote_id", quoteId);
+  const currentPriceListItemIds = (currentItems ?? [])
+    .map((item) => item.price_list_item_id)
+    .filter((id): id is string => id !== null);
+  if (currentPriceListItemIds.length === 0) return [];
+
+  // RLS scopes this to the caller's own org; excludes the current quote (a
+  // quote can't be historical evidence for its own suggestions) and any line
+  // item with no confident price-list match (nothing to key co-occurrence
+  // off of -- see lib/inventory/matchPriceListItem.ts).
+  const { data: historicalRows, error: historyError } = await supabase
+    .from("quote_line_items")
+    .select("quote_id, price_list_item_id")
+    .neq("quote_id", quoteId)
+    .not("price_list_item_id", "is", null);
+  if (historyError) {
+    console.error("Failed to load historical line items for upsell suggestions:", historyError);
+    return [];
+  }
+
+  const { data: priceList, error: priceListError } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit, unit_price_cents");
+  if (priceListError || !priceList) {
+    console.error("Failed to load price list for upsell suggestions:", priceListError);
+    return [];
+  }
+
+  const byQuote = new Map<string, Set<string>>();
+  for (const row of historicalRows ?? []) {
+    if (!row.price_list_item_id) continue;
+    const set = byQuote.get(row.quote_id) ?? new Set<string>();
+    set.add(row.price_list_item_id);
+    byQuote.set(row.quote_id, set);
+  }
+  const historicalQuotes: HistoricalQuote[] = [...byQuote.entries()].map(
+    ([historyQuoteId, ids]) => ({
+      quoteId: historyQuoteId,
+      priceListItemIds: [...ids],
+    }),
+  );
+
+  return computeUpsellSuggestions(
+    historicalQuotes,
+    currentPriceListItemIds,
+    priceList.map((p) => ({
+      id: p.id,
+      label: p.label,
+      unit: p.unit,
+      unitPriceCents: p.unit_price_cents,
+    })),
+  );
+}
+
+type AddSuggestedLineItemResult =
+  | { error: string; lineItems?: never; totals?: never }
+  | {
+      error: null;
+      lineItems: LineItemRow[];
+      totals: { subtotalCents: number; vatCents: number; totalCents: number };
+    };
+
+/**
+ * Adds one of the suggested price-list items (from getUpsellSuggestions)
+ * onto a draft quote as a new line item, priced straight from the price
+ * list (quantity 1), and recomputes totals -- mirrors updateLineItem's
+ * draft-only guard and totals recompute.
+ */
+export async function addSuggestedLineItem(
+  quoteId: string,
+  priceListItemId: string,
+): Promise<AddSuggestedLineItemResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, status, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status !== "draft") {
+    return { error: "Angebot ist bereits final und kann nicht mehr bearbeitet werden." };
+  }
+
+  const { data: priceListItem } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit, unit_price_cents")
+    .eq("id", priceListItemId)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+  if (!priceListItem) {
+    return { error: "Preislistenposition nicht gefunden." };
+  }
+
+  const { data: existingItems } = await supabase
+    .from("quote_line_items")
+    .select("position")
+    .eq("quote_id", quoteId)
+    .order("position", { ascending: false })
+    .limit(1);
+  const nextPosition = (existingItems?.[0]?.position ?? -1) + 1;
+
+  const priced = priceLineItem({
+    description: priceListItem.label,
+    quantity: 1,
+    unit: priceListItem.unit,
+    unitPriceCents: priceListItem.unit_price_cents,
+  });
+
+  const { error: insertError } = await supabase.from("quote_line_items").insert({
+    quote_id: quoteId,
+    description: priced.description,
+    quantity: priced.quantity,
+    unit: priced.unit,
+    unit_price_cents: priced.unitPriceCents,
+    line_total_cents: priced.lineTotalCents,
+    position: nextPosition,
+    organization_id: org.organizationId,
+    user_id: user.id,
+    price_list_item_id: priceListItem.id,
+  });
+  if (insertError) {
+    console.error("Failed to add suggested line item:", insertError);
+    return { error: "Position konnte nicht hinzugefügt werden." };
+  }
+
+  const { data: allItems, error: fetchError } = await supabase
+    .from("quote_line_items")
+    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
+    .eq("quote_id", quoteId)
+    .order("position");
+  if (fetchError || !allItems) {
+    return { error: "Positionen konnten nicht geladen werden." };
+  }
+
+  const totals = computeTotals(
+    allItems.map((item) => ({
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPriceCents: item.unit_price_cents,
+      lineTotalCents: item.line_total_cents,
+    })),
+  );
+
+  const { error: totalsError } = await supabase
+    .from("quotes")
+    .update({
+      subtotal_cents: totals.subtotalCents,
+      vat_cents: totals.vatCents,
+      total_cents: totals.totalCents,
+    })
+    .eq("id", quoteId);
+  if (totalsError) {
+    return { error: "Summen konnten nicht aktualisiert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null, lineItems: allItems, totals };
 }

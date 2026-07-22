@@ -69,17 +69,29 @@ export function QuoteTemplatesEditor({ templates: initialTemplates }: { template
             <tbody>
               {templates.map((template) => (
                 <tr key={template.id} className="border-b border-[#e9edf2] last:border-b-0">
-                  <td className="px-4 py-3 font-medium text-[#0f172a]">{template.name}</td>
+                  <td className="px-4 py-3 font-medium text-[#0f172a]">
+                    <Link href={`/quote-templates/${template.id}`} className="hover:text-[#2563eb] hover:underline">
+                      {template.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-[#64748b]">{template.itemCount}</td>
                   <td className="px-4 py-3 text-[#64748b]">{formatDate(template.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleDelete(template.id)}
-                      disabled={isPending}
-                      className="text-sm font-medium text-[#dc2626] hover:text-[#b91c1c] disabled:opacity-50"
-                    >
-                      {t.delete}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/quote-templates/${template.id}`}
+                        className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+                      >
+                        {t.edit}
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(template.id)}
+                        disabled={isPending}
+                        className="text-sm font-medium text-[#dc2626] hover:text-[#b91c1c] disabled:opacity-50"
+                      >
+                        {t.delete}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
