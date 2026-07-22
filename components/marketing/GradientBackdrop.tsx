@@ -42,18 +42,26 @@ export function GradientBackdrop({ className = "" }: { className?: string }) {
       aria-hidden
       className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
     >
-      {blobs.map((blob, index) => (
-        <motion.div
-          key={index}
-          className={`absolute rounded-full opacity-40 blur-3xl ${blob.className}`}
-          animate={blob.animate}
-          transition={
-            blob.animate
-              ? { duration: blob.duration, repeat: Infinity, ease: "easeInOut" }
-              : undefined
-          }
-        />
-      ))}
+      {blobs.map((blob, index) =>
+        shouldReduceMotion ? (
+          // Reduced-motion visitors get a plain static <div> instead of a
+          // framer-motion <motion.div> — this avoids mounting the library's
+          // per-element animation machinery (value proxies, RAF scheduling)
+          // entirely for content that never animates, rather than just
+          // skipping the visual tween.
+          <div
+            key={index}
+            className={`absolute rounded-full opacity-40 blur-3xl ${blob.className}`}
+          />
+        ) : (
+          <motion.div
+            key={index}
+            className={`absolute rounded-full opacity-40 blur-3xl ${blob.className}`}
+            animate={blob.animate}
+            transition={{ duration: blob.duration, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )
+      )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,transparent_0%,#020617_95%)]" />
     </div>
   );

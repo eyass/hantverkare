@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { MarketingShell } from "@/components/MarketingShell";
 import { PageHero } from "@/components/marketing/PageHero";
 import { AnimatedSection } from "@/components/marketing/AnimatedSection";
@@ -25,11 +22,7 @@ export default function PricingPage() {
       />
 
       <AnimatedSection className="mx-auto max-w-md px-4 py-16 sm:px-8">
-        <motion.div
-          whileHover={{ y: -4 }}
-          transition={{ duration: 0.25 }}
-          className="relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-[#e9edf2] bg-white p-8 shadow-[0_2px_8px_rgba(15,23,42,0.04),0_24px_56px_rgba(15,23,42,0.08)]"
-        >
+        <div className="relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-[#e9edf2] bg-white p-8 shadow-[0_2px_8px_rgba(15,23,42,0.04),0_24px_56px_rgba(15,23,42,0.08)] transition-transform duration-300 hover:-translate-y-1">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-700"
@@ -63,7 +56,7 @@ export default function PricingPage() {
           <p className="text-center text-xs text-[#94a3b8]">
             Keine Kreditkarte für die Testphase nötig. Danach 29 €/Monat, jederzeit kündbar.
           </p>
-        </motion.div>
+        </div>
       </AnimatedSection>
 
       <AnimatedSection className="mx-auto max-w-3xl px-4 pb-20 sm:px-8">
