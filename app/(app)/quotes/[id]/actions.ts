@@ -444,6 +444,55 @@ export async function assignQuote(
   return { error: null };
 }
 
+/**
+ * Toggles the opt-in public before/after photo gallery for a quote (issue
+ * #156). Defaults to OFF (see 0030_photo_gallery_sharing.sql) -- this is the
+ * only path that can turn it on, and it always requires the caller to belong
+ * to the quote's organization, same pattern as assignQuote above. Flipping
+ * the flag back off takes effect immediately: the public gallery page
+ * (app/gallery/[token]/page.tsx) re-checks gallery_enabled on every request,
+ * it does not just rely on the token being unguessable.
+ */
+export async function setGallerySharing(
+  quoteId: string,
+  enabled: boolean,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({ gallery_enabled: enabled })
+    .eq("id", quoteId);
+  if (updateError) {
+    console.error("Failed to update gallery sharing:", updateError);
+    return { error: "Einstellung konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null };
+}
+
 type ContractRow = {
   id: string;
   interval: ContractInterval;
