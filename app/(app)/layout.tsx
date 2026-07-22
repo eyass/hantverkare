@@ -17,12 +17,13 @@ export default async function AuthenticatedLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // `user` is expected to exist here because we just fetched it above; there is
-  // no middleware-level gate protecting every route in this group (proxy.ts's
-  // PROTECTED_PREFIXES only covers /quotes and /price-list). If `user` is
-  // somehow absent (e.g. a race with an expired session), render children
-  // without the shell rather than crashing -- the page itself will redirect
-  // via its own auth check on the next request.
+  // This layout does its own auth check rather than relying on middleware --
+  // lib/supabase/middleware.ts's proxy only gates /quotes and /price-list
+  // (its PROTECTED_PREFIXES), not the (app) group in general. This check, and
+  // the early return below, are what actually keep an unauthenticated or
+  // just-signed-out user from reaching ensureOrganization() below (see e.g.
+  // the post-delete flow in settings/danger-zone/actions.ts, which relies on
+  // this early return, not on proxy.ts, to prevent org re-creation).
   if (!user) {
     return children;
   }
