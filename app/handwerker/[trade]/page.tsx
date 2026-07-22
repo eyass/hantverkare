@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { MarketingShell } from "@/components/MarketingShell";
 import { QuoteDemo } from "@/components/QuoteDemo";
 import { PageHero } from "@/components/marketing/PageHero";
 import { AnimatedSection } from "@/components/marketing/AnimatedSection";
-import { QuoteFlowIllustration } from "@/components/marketing/illustrations/QuoteFlowIllustration";
 import { MicIcon, SparkleCalcIcon, SignatureIcon } from "@/components/marketing/illustrations/FeatureIcons";
-import { JsonLd } from "@/components/seo/JsonLd";
-import { buildSoftwareApplicationSchema } from "@/lib/seo/schema";
+import { TRADE_SLUGS, getTradeConfig, formatItemPrice } from "@/lib/trades/config";
+
+type PageProps = {
+  params: Promise<{ trade: string }>;
+};
 
 const STEPS = [
   {
@@ -27,98 +30,108 @@ const STEPS = [
   },
 ];
 
-const STATS = [
-  { value: "< 1 Minute", label: "statt 1 Stunde für ein Angebot" },
-  { value: "14 Tage", label: "kostenlos & unverbindlich testen" },
-  { value: "29 €/Monat", label: "danach, jederzeit kündbar" },
-];
+export function generateStaticParams() {
+  return TRADE_SLUGS.map((trade) => ({ trade }));
+}
 
-const TITLE = "hantverkare — Angebote für Handwerker in unter einer Minute";
-const DESCRIPTION =
-  "KI-gestützte Angebotssoftware für Handwerksbetriebe: Auftrag per Sprache oder Text beschreiben, Angebot per Klick erstellen, Kunde unterschreibt digital, Rechnung folgt automatisch.";
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { trade } = await params;
+  const config = getTradeConfig(trade);
+  if (!config) return {};
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
-    url: "/",
-    siteName: "hantverkare",
-    locale: "de_DE",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-};
+  return {
+    title: config.metaTitle,
+    description: config.metaDescription,
+    openGraph: {
+      title: config.metaTitle,
+      description: config.metaDescription,
+      url: `/handwerker/${config.slug}`,
+      siteName: "hantverkare",
+      locale: "de_DE",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: config.metaTitle,
+      description: config.metaDescription,
+    },
+  };
+}
 
-export default function Home() {
+export default async function TradePage({ params }: PageProps) {
+  const { trade } = await params;
+  const config = getTradeConfig(trade);
+  if (!config) notFound();
+
   return (
     <MarketingShell>
-      <JsonLd schema={buildSoftwareApplicationSchema()} />
       <PageHero
         eyebrow="14 Tage kostenlos testen"
-        title={
-          <>
-            Angebote für Handwerker —
-            <br className="hidden sm:block" /> in unter einer Minute.
-          </>
-        }
-        description="Beschreibe den Auftrag mit Stimme oder Text. Die KI erstellt sofort eine durchkalkulierte Positionsliste aus deiner Preisliste. Der Kunde unterschreibt digital — die Rechnung folgt automatisch."
+        title={config.heroTitle}
+        description={config.heroDescription}
+        compact
       >
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/login"
-              className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-[0_6px_24px_rgba(37,99,235,0.5)] transition hover:scale-[1.03] hover:from-blue-400 hover:to-blue-600"
-            >
-              Jetzt kostenlos starten
-            </Link>
-            <Link
-              href="/tool"
-              className="rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
-            >
-              So funktioniert&apos;s
-            </Link>
-          </div>
-          <div className="mx-auto mt-4 w-full max-w-md">
-            <QuoteFlowIllustration className="w-full" />
-          </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/login"
+            className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-[0_6px_24px_rgba(37,99,235,0.5)] transition hover:scale-[1.03] hover:from-blue-400 hover:to-blue-600"
+          >
+            Jetzt kostenlos starten
+          </Link>
+          <Link
+            href="/tool"
+            className="rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
+          >
+            So funktioniert&apos;s
+          </Link>
         </div>
       </PageHero>
 
-      <section className="relative overflow-hidden bg-[#020617] py-10 sm:py-14">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.18),transparent_60%)]"
-        />
-        <AnimatedSection className="relative mx-auto max-w-6xl px-4 sm:px-8">
-          <div className="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur sm:grid-cols-3 sm:p-10">
-            {STATS.map((stat) => (
-              <div key={stat.label} className="flex flex-col items-center gap-1 text-center">
-                <span className="mono text-2xl font-semibold text-white sm:text-3xl">
-                  {stat.value}
+      <AnimatedSection className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-4 py-16 text-center sm:px-8">
+        <h2 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
+          Gemacht für {config.labelDative}
+        </h2>
+        <p className="max-w-xl text-base leading-7 text-[#64748b]">{config.introBody}</p>
+      </AnimatedSection>
+
+      <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-8">
+        <AnimatedSection className="rounded-3xl border border-[#e9edf2] bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-10">
+          <h3 className="text-lg font-semibold text-[#0f172a]">
+            Beispielpositionen aus der {config.label}-Preisliste
+          </h3>
+          <p className="mt-1 text-sm text-[#64748b]">
+            So sieht die vorausgefüllte Preisliste für {config.labelDative} nach der Einrichtung aus — du kannst
+            jede Position anpassen.
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {config.exampleItems.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between gap-3 rounded-xl bg-[#f4f6f8] px-4 py-3 text-sm"
+              >
+                <div className="flex flex-col">
+                  <span className="font-medium text-[#0f172a]">{item.label}</span>
+                  <span className="text-xs text-[#94a3b8]">pro {item.unit}</span>
+                </div>
+                <span className="mono shrink-0 font-medium text-[#0f172a]">
+                  {formatItemPrice(item.priceCents)}
                 </span>
-                <span className="text-sm text-slate-300">{stat.label}</span>
               </div>
             ))}
           </div>
         </AnimatedSection>
       </section>
 
-      <AnimatedSection className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-16 sm:px-8">
+      <AnimatedSection className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 pb-16 sm:px-8">
         <h2 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
           Probier es direkt aus
         </h2>
         <p className="max-w-xl text-center text-base leading-7 text-[#64748b]">
-          Gib einen Auftrag ein oder wähle ein Beispiel — die Demo zeigt dir, wie ein fertiges
+          Gib einen {config.label}-Auftrag ein oder wähle ein Beispiel — die Demo zeigt dir, wie ein fertiges
           Angebot aussieht. Kein Konto nötig, keine echten Daten.
         </p>
         <div className="mt-4 w-full">
-          <QuoteDemo />
+          <QuoteDemo preferredJobIds={config.demoJobIds} defaultDescription={config.demoDefaultDescription} />
         </div>
       </AnimatedSection>
 
@@ -164,3 +177,4 @@ export default function Home() {
     </MarketingShell>
   );
 }
+
