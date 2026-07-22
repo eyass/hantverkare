@@ -11,6 +11,9 @@ export type OrgPermissionSettings = {
   dunningEscalationDays: number;
   dunningTone: "freundlich" | "neutral" | "streng";
   inventoryDecrementEnabled: boolean;
+  reviewRequestEnabled: boolean;
+  reviewRequestDays: number;
+  reviewPlatformUrl: string | null;
 };
 
 /**
@@ -29,7 +32,7 @@ export async function getOrgSettings(
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "members_can_delete_customers, members_can_view_billing, members_can_edit_business_settings, sms_notifications_enabled, dunning_enabled, dunning_reminder_days, dunning_mahnung_days, dunning_escalation_days, dunning_tone, inventory_decrement_enabled",
+      "members_can_delete_customers, members_can_view_billing, members_can_edit_business_settings, sms_notifications_enabled, dunning_enabled, dunning_reminder_days, dunning_mahnung_days, dunning_escalation_days, dunning_tone, inventory_decrement_enabled, review_request_enabled, review_request_days, review_platform_url",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -50,5 +53,8 @@ export async function getOrgSettings(
     dunningEscalationDays: data.dunning_escalation_days,
     dunningTone: data.dunning_tone,
     inventoryDecrementEnabled: data.inventory_decrement_enabled,
+    reviewRequestEnabled: data.review_request_enabled,
+    reviewRequestDays: data.review_request_days,
+    reviewPlatformUrl: data.review_platform_url,
   };
 }
