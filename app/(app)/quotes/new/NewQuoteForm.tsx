@@ -88,6 +88,7 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
   const draftRef = useRef<QuoteDraft>({ customerId: "", description: "" });
   const [notes, setNotes] = useState<VoiceNote[]>([]);
   const notesRef = useRef<VoiceNote[]>([]);
+  const hasManualEditRef = useRef(false);
   const hasSubmittedRef = useRef(false);
   const wasPendingRef = useRef(false);
   const retryInFlightRef = useRef(false);
@@ -101,6 +102,10 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
       draftRef.current = draft;
       if (draft.description && textareaRef.current) {
         textareaRef.current.value = draft.description;
+        // A restored draft's text isn't derived from any (session-only)
+        // notes, so treat it the same as a manual edit: preserve it rather
+        // than letting the next note recompute the field from scratch.
+        hasManualEditRef.current = true;
       }
       if (draft.customerId && customerSelectRef.current) {
         customerSelectRef.current.value = draft.customerId;
@@ -148,6 +153,7 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
     clearQueuedGenerationStore();
     draftRef.current = { customerId: "", description: "" };
     notesRef.current.forEach((note) => URL.revokeObjectURL(note.audioUrl));
+    hasManualEditRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotes([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,22 +200,19 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
     };
   }, []);
 
-  // Tracks the last description we auto-wrote into the textarea, so we can
-  // tell whether the craftsman has manually edited it since. If they have,
-  // recomputing the full join-of-all-notes on the next note add/delete would
-  // silently clobber their edit -- instead we append the new note onto
-  // whatever text is currently there, and leave deletions to just drop that
-  // note's own future contribution rather than rewriting the field.
-  const lastAppliedDescriptionRef = useRef("");
-
+  // hasManualEditRef is sticky: once the craftsman has touched the textarea
+  // directly (or a restored draft seeded it with text no note accounts for),
+  // recomputing the full join-of-all-notes on a later note add/delete would
+  // silently clobber that text. So once set, applyDescription never goes
+  // back to the "recompute from scratch" branch again for this session --
+  // it only appends newly recorded notes onto whatever's already there, and
+  // leaves deletions alone rather than rewriting the field.
   function applyDescription(nextNotes: VoiceNote[], newlyAddedText?: string) {
-    const combined = nextNotes.map((note) => note.text).join("\n\n");
     const current = textareaRef.current?.value ?? "";
-    const wasManuallyEdited = current !== lastAppliedDescriptionRef.current;
 
     let result: string;
-    if (!wasManuallyEdited) {
-      result = combined;
+    if (!hasManualEditRef.current) {
+      result = nextNotes.map((note) => note.text).join("\n\n");
     } else if (newlyAddedText) {
       result = current ? `${current}\n\n${newlyAddedText}` : newlyAddedText;
     } else {
@@ -219,7 +222,6 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
     if (textareaRef.current) {
       textareaRef.current.value = result;
     }
-    lastAppliedDescriptionRef.current = result;
     persistDraft({ description: result });
   }
 
@@ -310,7 +312,10 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
             required
             rows={6}
             maxLength={2000}
-            onChange={(e) => persistDraft({ description: e.target.value })}
+            onChange={(e) => {
+              hasManualEditRef.current = true;
+              persistDraft({ description: e.target.value });
+            }}
             placeholder="Beschreibe den Auftrag, z. B. Küchenspüle austauschen, neuen Wasserhahn montieren, 2 Stunden Arbeit"
             className="w-full rounded-xl border border-[#e9edf2] p-3 text-base text-[#0f172a] placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:outline-none"
           />
