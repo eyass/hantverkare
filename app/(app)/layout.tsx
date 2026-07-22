@@ -17,11 +17,12 @@ export default async function AuthenticatedLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // proxy.ts already redirects unauthenticated requests to /login for every route
-  // under this group, so `user` is expected to exist here. If it's somehow absent
-  // (e.g. a race with an expired session), render children without the shell rather
-  // than crashing -- the page itself will redirect via its own auth check on the
-  // next request.
+  // `user` is expected to exist here because we just fetched it above; there is
+  // no middleware-level gate protecting every route in this group (proxy.ts's
+  // PROTECTED_PREFIXES only covers /quotes and /price-list). If `user` is
+  // somehow absent (e.g. a race with an expired session), render children
+  // without the shell rather than crashing -- the page itself will redirect
+  // via its own auth check on the next request.
   if (!user) {
     return children;
   }
@@ -38,11 +39,20 @@ export default async function AuthenticatedLayout({
   // run unconditionally here, before the billing gate below. Users with no
   // enrolled factor see currentLevel === nextLevel === 'aal1' and are
   // completely unaffected, per the feature being opt-in.
+  //
+  // This check must fail CLOSED: if the AAL lookup itself errors out (network
+  // blip, transient Supabase issue, rate limit, etc.) we cannot conclude the
+  // user has satisfied any step-up requirement, so we treat that the same as
+  // "must step up" rather than silently letting the request through. This is
+  // safe for users with no enrolled factor too: /mfa-challenge performs its
+  // own AAL check and immediately redirects them on to `next` when there's
+  // nothing to challenge (including on its own transient errors), so routing
+  // everyone through it here does not risk locking out non-MFA users.
   const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aalError) {
-    console.error("Failed to get authenticator assurance level:", aalError);
-  }
-  if (aal && aal.nextLevel !== aal.currentLevel) {
+  if (aalError || !aal || aal.nextLevel !== aal.currentLevel) {
+    if (aalError) {
+      console.error("Failed to get authenticator assurance level:", aalError);
+    }
     const pathnameForChallenge = (await headers()).get("x-pathname") ?? "/price-list";
     redirect(`/mfa-challenge?next=${encodeURIComponent(pathnameForChallenge)}`);
   }
