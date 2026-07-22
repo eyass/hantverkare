@@ -514,3 +514,29 @@ possible (same email rate-limit blocker as above). Please eyeball:
 - [x] "Zurück" returns to the trade picker without losing template data.
 - [x] "Leer starten" goes straight to the existing manual editor.
 - [x] `/price-list` with existing items shows the normal editor, no wizard.
+
+## Quote expiry + reminder emails (T2, issue #49) — human setup required
+
+- [ ] Apply migration `0013_quote_expiry.sql` in the Supabase SQL editor (after
+  0012, and whatever else has landed by then — check the migrations folder for
+  the current highest number first). Adds nullable `expires_at` and
+  `expiry_reminder_sent_at` to `quotes`; no RLS changes needed.
+- [ ] **New secret — `CRON_SECRET`**: add a random, high-entropy string to the
+  Vercel project's env vars (Production + Preview). This protects
+  `app/api/cron/quote-expiry-reminders/route.ts` — Vercel Cron automatically
+  sends it back as `Authorization: Bearer $CRON_SECRET` on every scheduled
+  invocation (Vercel's documented convention), and the route rejects any
+  request whose header doesn't match, including if the env var is unset
+  (fails closed). Generate e.g. via `openssl rand -hex 32`.
+- [ ] Confirm `vercel.json`'s `crons` entry (`/api/cron/quote-expiry-reminders`,
+  daily at 08:00 UTC) is picked up after deploying — check the Vercel
+  dashboard's Cron Jobs tab.
+- [ ] Once a quote has been finalized with an `expires_at` within the next 3
+  days and the cron has run, confirm: the tradesperson receives a "läuft
+  bald ab" email, the customer receives one too if they have an email on
+  file, and `expiry_reminder_sent_at` gets stamped (re-running the cron
+  must NOT send a second email for the same quote).
+- [ ] `/quotes` — finalized-but-unsigned quotes show the expiry countdown
+  badge ("Läuft in N Tagen ab" / "Läuft morgen ab" / "Läuft heute ab" /
+  "Abgelaufen") next to the status pill; draft and signed quotes show no
+  expiry badge.
