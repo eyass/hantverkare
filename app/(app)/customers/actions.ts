@@ -4,6 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { getOrgSettings } from "@/lib/organizations/getOrgSettings";
 import { canDeleteCustomers } from "@/lib/organizations/permissions";
+import {
+  parseCustomerImport,
+  type CustomerRowError,
+  type ParsedCustomerRow,
+} from "@/lib/customers/importCustomers";
 
 export type CustomerInput = {
   name: string;
@@ -120,4 +125,88 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
   }
 
   return { error: null };
+}
+
+export type CustomerImportPreviewResult =
+  | { error: string; validRows?: never; errors?: never }
+  | { error: null; validRows: ParsedCustomerRow[]; errors: CustomerRowError[] };
+
+/**
+ * Parses+validates an uploaded CSV file for the customer-import preview step.
+ * Purely a parsing/validation pass -- nothing is written to the database
+ * here, so it doesn't need org resolution. `commitCustomerImport` re-parses
+ * and re-resolves the org itself rather than trusting the client to send
+ * back exactly what this returned.
+ */
+export async function previewCustomerImport(csvText: string): Promise<CustomerImportPreviewResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  if (csvText.trim().length === 0) {
+    return { error: "Die Datei ist leer." };
+  }
+
+  const { validRows, errors } = parseCustomerImport(csvText);
+
+  if (validRows.length === 0 && errors.length === 0) {
+    return { error: "Die Datei enthält keine Kundendaten." };
+  }
+
+  return { error: null, validRows, errors };
+}
+
+export type CustomerImportCommitResult =
+  | { error: string; imported?: never }
+  | { error: null; imported: number };
+
+/**
+ * Commits a previously previewed CSV import: re-parses the raw CSV text
+ * server-side (never trusts client-supplied row objects) and bulk-inserts
+ * only the rows that pass validation, scoped to the caller's org resolved
+ * via getCurrentOrg -- same trust-boundary pattern as
+ * lib/priceList/templateSelection.ts and lib/quoteTemplates/templateBuilder.ts.
+ * Rows that fail validation are simply not inserted; the caller already saw
+ * them flagged during the preview step, so there is no silent partial-commit
+ * ambiguity -- the same parse always yields the same valid/invalid split.
+ */
+export async function commitCustomerImport(csvText: string): Promise<CustomerImportCommitResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { validRows } = parseCustomerImport(csvText);
+  if (validRows.length === 0) {
+    return { error: "Keine gültigen Kundenzeilen zum Importieren gefunden." };
+  }
+
+  const rowsToInsert = validRows.map((row) => ({
+    name: row.name,
+    email: row.email || null,
+    phone: row.phone || null,
+    address: row.address || null,
+    organization_id: org.organizationId,
+    user_id: user.id,
+  }));
+
+  const { error, data } = await supabase.from("customers").insert(rowsToInsert).select("id");
+  if (error) {
+    console.error("Failed to bulk-import customers:", error);
+    return { error: "Import fehlgeschlagen. Es wurde nichts gespeichert." };
+  }
+
+  return { error: null, imported: data?.length ?? rowsToInsert.length };
 }
