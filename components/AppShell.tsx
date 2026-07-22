@@ -4,28 +4,36 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
+import { APP_SHELL_DICTIONARY } from "@/components/AppShell.dictionary";
 
 type NavItem = {
   href: string;
   label: string;
 };
 
-const BASE_NAV_ITEMS: NavItem[] = [
-  { href: "/quotes", label: "Angebote" },
-  { href: "/customers", label: "Kunden" },
-  { href: "/price-list", label: "Preisliste" },
-  { href: "/quote-templates", label: "Vorlagen" },
-  { href: "/reports", label: "Berichte" },
-  { href: "/settings", label: "Einstellungen" },
-];
-
-// Only owners manage the team / danger zone; members never see these links
-// (and the Server Actions behind them enforce owner-only server-side
-// regardless).
-const OWNER_NAV_ITEMS: NavItem[] = [
-  { href: "/settings/team", label: "Team" },
-  { href: "/settings/danger-zone", label: "Danger Zone" },
-];
+function buildNavItems(t: (typeof APP_SHELL_DICTIONARY)["de"]): {
+  base: NavItem[];
+  owner: NavItem[];
+} {
+  return {
+    base: [
+      { href: "/quotes", label: t.nav.quotes },
+      { href: "/customers", label: t.nav.customers },
+      { href: "/price-list", label: t.nav.priceList },
+      { href: "/quote-templates", label: t.nav.quoteTemplates },
+      { href: "/reports", label: t.nav.reports },
+      { href: "/settings", label: t.nav.settings },
+    ],
+    // Only owners manage the team / danger zone; members never see these
+    // links (and the Server Actions behind them enforce owner-only
+    // server-side regardless).
+    owner: [
+      { href: "/settings/team", label: t.nav.team },
+      { href: "/settings/danger-zone", label: t.nav.dangerZone },
+    ],
+  };
+}
 
 // The active item is the one whose href is the longest prefix of the current
 // path, so e.g. /settings/team highlights "Team" and not also "Einstellungen".
@@ -51,8 +59,10 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const NAV_ITEMS =
-    role === "owner" ? [...BASE_NAV_ITEMS, ...OWNER_NAV_ITEMS] : BASE_NAV_ITEMS;
+  const { language } = useAppLanguage();
+  const t = APP_SHELL_DICTIONARY[language];
+  const { base, owner } = buildNavItems(t);
+  const NAV_ITEMS = role === "owner" ? [...base, ...owner] : base;
   const currentHref = activeHref(pathname, NAV_ITEMS);
 
   return (
@@ -87,7 +97,7 @@ export function AppShell({
             <div className="truncate text-[13px] font-semibold">{email}</div>
             <form action={signOutAction}>
               <button type="submit" className="text-[11px] text-[#94a3b8] underline">
-                Abmelden
+                {t.signOut}
               </button>
             </form>
           </div>

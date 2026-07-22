@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
+import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
 import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { computeProfitability } from "@/lib/quotes/profitability";
@@ -78,11 +79,13 @@ export function QuoteEditor({
   lineItems,
   invoice,
   photos,
+  warranty,
 }: {
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
   photos: Photo[];
+  warranty: WarrantyRecord | null;
 }) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
@@ -335,6 +338,7 @@ export function QuoteEditor({
           </a>
 
           {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
+          {status === "signed" && <WarrantySection warranty={warranty} />}
 
           {isDraft && <SaveAsTemplateSection quoteId={quote.id} />}
         </div>

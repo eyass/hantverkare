@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { getOrgSettings } from "@/lib/organizations/getOrgSettings";
 import { canEditBusinessSettings } from "@/lib/organizations/permissions";
+import { isAppLanguage, type AppLanguage } from "@/lib/i18n/dictionary";
 
 export type BusinessSettingsInput = {
   companyName: string;
@@ -69,6 +70,43 @@ export async function saveBusinessSettings(
   if (error) {
     console.error("Failed to save business settings:", error);
     return { error: "Einstellungen konnten nicht gespeichert werden." };
+  }
+
+  return { error: null };
+}
+
+/**
+ * Updates the signed-in user's UI language preference (issue #116).
+ *
+ * Server-side validated regardless of what the client sends -- `next` must
+ * be exactly "de" or "en" -- rejecting anything else with an error rather
+ * than trusting the client-supplied value, same discipline as
+ * saveBusinessSettings above. RLS's existing "Users can update their own
+ * profile" policy (0001_init.sql) scopes the write to `auth.uid() = id`, so
+ * no explicit org/role check is needed here -- this is a personal
+ * preference, not organization data.
+ */
+export async function updateLanguage(next: AppLanguage): Promise<ActionResult> {
+  if (!isAppLanguage(next)) {
+    return { error: "Ungültige Sprache." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ language: next })
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("Failed to update language preference:", error);
+    return { error: "Sprache konnte nicht gespeichert werden." };
   }
 
   return { error: null };

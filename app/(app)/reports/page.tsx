@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { computeProfitability } from "@/lib/quotes/profitability";
+import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
+import { REPORTS_DICTIONARY } from "./reports.dictionary";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -15,6 +17,9 @@ export default async function ReportsPage() {
   if (error) {
     console.error("Failed to load quotes for reports:", error);
   }
+
+  const language = await getUserLanguage(supabase);
+  const t = REPORTS_DICTIONARY[language];
 
   const rows = quotes ?? [];
   const totalQuotes = rows.length;
@@ -62,24 +67,24 @@ export default async function ReportsPage() {
   }
 
   const tiles: { label: string; value: string }[] = [
-    { label: "Angebote insgesamt", value: String(totalQuotes) },
-    { label: "Entwurf", value: String(draftCount) },
-    { label: "Final", value: String(finalCount) },
-    { label: "Signiert", value: String(signedCount) },
+    { label: t.tileTotalQuotes, value: String(totalQuotes) },
+    { label: t.tileDraft, value: String(draftCount) },
+    { label: t.tileFinal, value: String(finalCount) },
+    { label: t.tileSigned, value: String(signedCount) },
     {
-      label: "Abschlussquote",
+      label: t.tileConversionRate,
       value: conversionRate === null ? "–" : formatPercent(conversionRate),
     },
-    { label: "Umsatz (signiert)", value: formatEuros(totalRevenueCents) },
+    { label: t.tileRevenue, value: formatEuros(totalRevenueCents) },
     {
-      label: "Ø Wert pro signiertem Angebot",
+      label: t.tileAvgSignedValue,
       value: averageSignedValueCents === null ? "–" : formatEuros(averageSignedValueCents),
     },
   ];
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold text-[#0f172a]">Auswertung</h1>
+      <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {tiles.map((tile) => (
           <div
@@ -93,11 +98,10 @@ export default async function ReportsPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium text-[#0f172a]">Profitabilität (intern)</h2>
+        <h2 className="text-lg font-medium text-[#0f172a]">{t.profitabilityTitle}</h2>
         {profitability.itemsWithCostCount === 0 ? (
           <div className="rounded-2xl border border-[#e9edf2] bg-white p-4 text-sm text-[#64748b]">
-            – Noch keine Kostendaten erfasst. Trage bei Angebotspositionen optional Kosten ein, um
-            hier die Marge zu sehen.
+            {t.profitabilityEmpty}
           </div>
         ) : (
           <>
@@ -106,20 +110,20 @@ export default async function ReportsPage() {
                 <span className="font-mono text-2xl font-bold text-[#0f172a]">
                   {formatEuros(profitability.revenueCents)}
                 </span>
-                <span className="text-sm text-[#64748b]">Umsatz (mit Kostendaten)</span>
+                <span className="text-sm text-[#64748b]">{t.profitabilityRevenue}</span>
               </div>
               <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
                 <span className="font-mono text-2xl font-bold text-[#0f172a]">
                   {formatEuros(profitability.costCents)}
                 </span>
-                <span className="text-sm text-[#64748b]">Kosten</span>
+                <span className="text-sm text-[#64748b]">{t.profitabilityCost}</span>
               </div>
               <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
                 <span className="font-mono text-2xl font-bold text-[#0f172a]">
                   {formatEuros(profitability.marginCents)}
                 </span>
                 <span className="text-sm text-[#64748b]">
-                  Rohertrag{" "}
+                  {t.profitabilityMargin}{" "}
                   {profitability.marginPercent !== null &&
                     `(${formatPercent(profitability.marginPercent)})`}
                 </span>
@@ -127,9 +131,10 @@ export default async function ReportsPage() {
             </div>
             {profitability.hasIncompleteData && (
               <p className="text-sm text-[#94a3b8]">
-                Hinweis: Nicht für alle Positionen sind Kosten hinterlegt ({profitability.itemsWithCostCount}{" "}
-                von {profitability.itemCount}). Die Marge oben bezieht sich nur auf Positionen mit
-                erfassten Kosten.
+                {t.profitabilityIncomplete(
+                  profitability.itemsWithCostCount,
+                  profitability.itemCount,
+                )}
               </p>
             )}
           </>

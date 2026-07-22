@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { deleteQuoteTemplate } from "./actions";
+import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
+import { QUOTE_TEMPLATES_DICTIONARY } from "./quote-templates.dictionary";
 
 type Template = {
   id: string;
@@ -16,6 +18,8 @@ function formatDate(iso: string): string {
 }
 
 export function QuoteTemplatesEditor({ templates: initialTemplates }: { templates: Template[] }) {
+  const { language } = useAppLanguage();
+  const t = QUOTE_TEMPLATES_DICTIONARY[language];
   const [templates, setTemplates] = useState(initialTemplates);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -35,31 +39,30 @@ export function QuoteTemplatesEditor({ templates: initialTemplates }: { template
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-[#0f172a]">Angebotsvorlagen</h1>
+        <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
         <Link
           href="/quotes/new"
           className="rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8]"
         >
-          Neues Angebot
+          {t.newQuote}
         </Link>
       </div>
       <p className="text-sm text-[#64748b]">
-        Speichere wiederkehrende Positionen (z. B. &bdquo;Badezimmer Renovierung Standard&ldquo;) als Vorlage bei
-        einem Angebot und füge sie hier verwaltet oder beim Erstellen eines neuen Angebots wieder ein.
+        {t.description}
       </p>
       {error && <p className="text-sm text-[#dc2626]">{error}</p>}
       {templates.length === 0 ? (
         <p className="rounded-2xl border border-[#e9edf2] bg-white p-6 text-sm text-[#64748b]">
-          Noch keine Vorlagen gespeichert. Öffne ein Angebot und speichere seine Positionen als Vorlage.
+          {t.emptyState}
         </p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-[#e9edf2] text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Positionen</th>
-                <th className="px-4 py-3">Erstellt</th>
+                <th className="px-4 py-3">{t.colName}</th>
+                <th className="px-4 py-3">{t.colItems}</th>
+                <th className="px-4 py-3">{t.colCreated}</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -75,7 +78,7 @@ export function QuoteTemplatesEditor({ templates: initialTemplates }: { template
                       disabled={isPending}
                       className="text-sm font-medium text-[#dc2626] hover:text-[#b91c1c] disabled:opacity-50"
                     >
-                      Löschen
+                      {t.delete}
                     </button>
                   </td>
                 </tr>

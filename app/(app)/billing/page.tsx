@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { canViewBilling } from "@/lib/organizations/permissions";
+import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
+import { BILLING_DICTIONARY } from "./billing.dictionary";
 import { createCheckoutSession, createBillingPortalSession } from "./actions";
 
 function formatDate(iso: string | null): string | null {
@@ -15,18 +17,17 @@ function formatDate(iso: string | null): string | null {
 export default async function BillingPage() {
   const supabase = await createClient();
   const org = await getCurrentOrg(supabase);
+  const language = await getUserLanguage(supabase);
+  const t = BILLING_DICTIONARY[language];
 
   // Billing is per-organization and owner-only. Members see a notice instead of
   // the subscription controls (the Server Actions also enforce this).
   if (org && !canViewBilling(org.role)) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <h1 className="text-2xl font-semibold">Abonnement</h1>
+        <h1 className="text-2xl font-semibold">{t.title}</h1>
         <div className="mt-6 rounded-lg border p-6">
-          <p>
-            Das Abonnement wird vom Inhaber deiner Organisation verwaltet. Bitte
-            wende dich an den Inhaber, wenn du Fragen zur Abrechnung hast.
-          </p>
+          <p>{t.ownerManagedNotice}</p>
         </div>
       </div>
     );
@@ -50,24 +51,15 @@ export default async function BillingPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Abonnement</h1>
+      <h1 className="text-2xl font-semibold">{t.title}</h1>
 
       <div className="mt-6 rounded-lg border p-6">
-        {status === "trialing" && (
-          <p>
-            Du befindest dich in der kostenlosen Testphase
-            {trialEndsAt ? ` bis zum ${trialEndsAt}` : ""}. Danach kostet hantverkare
-            29&nbsp;€/Monat.
-          </p>
-        )}
-        {status === "active" && <p>Dein Abonnement ist aktiv. Vielen Dank!</p>}
+        {status === "trialing" && <p>{t.trialing(trialEndsAt)}</p>}
+        {status === "active" && <p>{t.active}</p>}
         {(status === "canceled" || status === "past_due" || status === "unpaid") && (
-          <p>
-            Dein Abonnement ist derzeit nicht aktiv (Status: {status}). Bitte
-            abonniere erneut, um weiter Zugriff zu haben.
-          </p>
+          <p>{t.inactive(status)}</p>
         )}
-        {!status && <p>Du hast noch kein Abonnement.</p>}
+        {!status && <p>{t.none}</p>}
 
         <div className="mt-6 flex gap-3">
           {status !== "active" && (
@@ -76,7 +68,7 @@ export default async function BillingPage() {
                 type="submit"
                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
               >
-                Jetzt abonnieren (29&nbsp;€/Monat)
+                {t.subscribe}
               </button>
             </form>
           )}
@@ -86,7 +78,7 @@ export default async function BillingPage() {
                 type="submit"
                 className="rounded-md border px-4 py-2 text-sm font-medium"
               >
-                Abonnement verwalten
+                {t.manage}
               </button>
             </form>
           )}
