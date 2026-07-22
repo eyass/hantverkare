@@ -103,13 +103,21 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">Kunden</h1>
-        <a
-          href="/api/export/customers"
-          download
-          className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
-        >
-          Als CSV exportieren
-        </a>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/customers/import"
+            className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
+          >
+            Kunden importieren
+          </Link>
+          <a
+            href="/api/export/customers"
+            download
+            className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
+          >
+            Als CSV exportieren
+          </a>
+        </div>
       </div>
       {error && <p className="text-sm text-[#dc2626]">{error}</p>}
       <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
