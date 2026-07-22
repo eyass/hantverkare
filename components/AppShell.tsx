@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 type NavItem = {
   href: string;
@@ -90,6 +91,9 @@ export function AppShell({
 
       {/* Main content */}
       <div className="flex min-h-screen flex-1 flex-col bg-[#f4f6f8]">
+        <div className="flex items-center border-b border-[#e9edf2] bg-white px-4 py-3 md:px-8">
+          <GlobalSearch />
+        </div>
         <div className="flex-1 pb-16 md:pb-0">{children}</div>
 
         {/* Mobile bottom tabs */}
