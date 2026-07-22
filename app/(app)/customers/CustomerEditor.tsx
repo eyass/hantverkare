@@ -8,6 +8,8 @@ import {
   deleteCustomer,
   type CustomerInput,
 } from "./actions";
+import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
+import { CUSTOMERS_DICTIONARY } from "./customers.dictionary";
 
 type Customer = {
   id: string;
@@ -21,6 +23,8 @@ const inputClass =
   "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-[#0f172a] outline-none transition-colors focus:border-[#e9edf2] focus:bg-[#f4f6f8]";
 
 export function CustomerEditor({ customers: initialCustomers }: { customers: Customer[] }) {
+  const { language } = useAppLanguage();
+  const t = CUSTOMERS_DICTIONARY[language];
   const [customers, setCustomers] = useState(initialCustomers);
   const [lastSavedCustomers, setLastSavedCustomers] = useState(initialCustomers);
   const [error, setError] = useState<string | null>(null);
@@ -102,20 +106,20 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-[#0f172a]">Kunden</h1>
+        <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
         <div className="flex items-center gap-2">
           <Link
             href="/customers/import"
             className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
           >
-            Kunden importieren
+            {t.importCustomers}
           </Link>
           <a
             href="/api/export/customers"
             download
             className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
           >
-            Als CSV exportieren
+            {t.exportCsv}
           </a>
         </div>
       </div>
@@ -124,10 +128,10 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
         <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[#e9edf2] text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">E-Mail</th>
-              <th className="px-4 py-3">Telefon</th>
-              <th className="px-4 py-3">Adresse</th>
+              <th className="px-4 py-3">{t.colName}</th>
+              <th className="px-4 py-3">{t.colEmail}</th>
+              <th className="px-4 py-3">{t.colPhone}</th>
+              <th className="px-4 py-3">{t.colAddress}</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -172,13 +176,13 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
                       href={`/customers/${customer.id}`}
                       className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
                     >
-                      Verlauf
+                      {t.history}
                     </Link>
                     <button
                       onClick={() => handleDelete(customer.id)}
                       className="text-sm font-medium text-[#dc2626] hover:text-[#b91c1c]"
                     >
-                      Löschen
+                      {t.delete}
                     </button>
                   </div>
                 </td>
@@ -188,30 +192,30 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
         </table>
       </div>
       <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-6">
-        <h2 className="text-lg font-medium text-[#0f172a]">Neuer Kunde</h2>
+        <h2 className="text-lg font-medium text-[#0f172a]">{t.newCustomerTitle}</h2>
         <div className="flex flex-wrap gap-2">
           <input
             value={newCustomer.name}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Name"
+            placeholder={t.namePlaceholder}
             className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newCustomer.email}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, email: e.target.value }))}
-            placeholder="E-Mail"
+            placeholder={t.emailPlaceholder}
             className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newCustomer.phone}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))}
-            placeholder="Telefon"
+            placeholder={t.phonePlaceholder}
             className="w-32 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
           <input
             value={newCustomer.address}
             onChange={(e) => setNewCustomer((prev) => ({ ...prev, address: e.target.value }))}
-            placeholder="Adresse"
+            placeholder={t.addressPlaceholder}
             className="flex-1 rounded-xl border border-[#e9edf2] p-2.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
           />
         </div>
@@ -220,7 +224,7 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
           disabled={isPending}
           className="self-start rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
         >
-          Kunde hinzufügen
+          {t.addCustomer}
         </button>
       </div>
     </div>
