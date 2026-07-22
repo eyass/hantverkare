@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { generateQuoteDraft, type GenerateQuoteState } from "./actions";
-import { VoiceRecorder } from "./VoiceRecorder";
+import { VoiceRecorder, type RecordedNote } from "./VoiceRecorder";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
 import { clearDraft, loadDraft, saveDraft, type QuoteDraft } from "@/lib/quotes/draftStorage";
 import { MAX_AUTO_RETRY_ATTEMPTS, shouldAutoRetry } from "@/lib/quotes/generationQueue";
@@ -61,6 +61,18 @@ type Customer = {
   name: string;
 };
 
+type VoiceNote = {
+  id: string;
+  text: string;
+  audioUrl: string;
+};
+
+let noteIdCounter = 0;
+function nextNoteId(): string {
+  noteIdCounter += 1;
+  return `note-${noteIdCounter}`;
+}
+
 export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
   const [state, formAction, isPending] = useActionState(submitOrQueue, initialState);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -74,6 +86,8 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
   // this ref just mirrors the current values so we know what to persist to
   // localStorage, without routing every keystroke through React state.
   const draftRef = useRef<QuoteDraft>({ customerId: "", description: "" });
+  const [notes, setNotes] = useState<VoiceNote[]>([]);
+  const notesRef = useRef<VoiceNote[]>([]);
   const hasSubmittedRef = useRef(false);
   const wasPendingRef = useRef(false);
   const retryInFlightRef = useRef(false);
@@ -133,6 +147,9 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
     clearDraft(window.localStorage);
     clearQueuedGenerationStore();
     draftRef.current = { customerId: "", description: "" };
+    notesRef.current.forEach((note) => URL.revokeObjectURL(note.audioUrl));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNotes([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPending, state.error, state.queuedOffline]);
 
@@ -158,11 +175,41 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
     saveDraft(window.localStorage, draftRef.current);
   }
 
-  function handleTranscript(text: string) {
+  // Keep a ref mirror of notes (for unmount cleanup) and revoke every note's
+  // object URL on unmount to avoid leaking blob memory.
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+  useEffect(() => {
+    return () => {
+      notesRef.current.forEach((note) => URL.revokeObjectURL(note.audioUrl));
+    };
+  }, []);
+
+  function applyDescription(nextNotes: VoiceNote[]) {
+    const combined = nextNotes.map((note) => note.text).join("\n\n");
     if (textareaRef.current) {
-      textareaRef.current.value = text;
+      textareaRef.current.value = combined;
     }
-    persistDraft({ description: text });
+    persistDraft({ description: combined });
+  }
+
+  function handleNoteRecorded(note: RecordedNote) {
+    setNotes((prev) => {
+      const next = [...prev, { id: nextNoteId(), ...note }];
+      applyDescription(next);
+      return next;
+    });
+  }
+
+  function handleDeleteNote(id: string) {
+    setNotes((prev) => {
+      const removed = prev.find((note) => note.id === id);
+      if (removed) URL.revokeObjectURL(removed.audioUrl);
+      const next = prev.filter((note) => note.id !== id);
+      applyDescription(next);
+      return next;
+    });
   }
 
   const isQueued = queued !== null && !isPending;
@@ -239,7 +286,43 @@ export default function NewQuoteForm({ customers }: { customers: Customer[] }) {
             className="w-full rounded-xl border border-[#e9edf2] p-3 text-base text-[#0f172a] placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:outline-none"
           />
         </div>
-        <VoiceRecorder onTranscript={handleTranscript} />
+        <VoiceRecorder onNoteRecorded={handleNoteRecorded} hasNotes={notes.length > 0} />
+        {notes.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-[#0f172a]">
+              Sprachnotizen ({notes.length})
+            </span>
+            <ul className="flex flex-col gap-2">
+              {notes.map((note, i) => (
+                <li
+                  key={note.id}
+                  className="flex items-center gap-3 rounded-xl border border-[#e9edf2] bg-[#f8fafc] p-3"
+                >
+                  <span className="text-sm font-semibold text-[#64748b]">{i + 1}</span>
+                  <audio controls src={note.audioUrl} className="h-9 flex-1" />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteNote(note.id)}
+                    aria-label={`Notiz ${i + 1} löschen`}
+                    className="rounded-full p-1.5 text-[#94a3b8] transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
         <button
           type="submit"
