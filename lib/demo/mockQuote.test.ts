@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { generateDemoQuote, matchJobTemplate, formatCents, DEMO_JOB_TEMPLATES } from "./mockQuote";
+import {
+  generateDemoQuote,
+  matchJobTemplate,
+  formatCents,
+  DEMO_JOB_TEMPLATES,
+  getJobTemplatesForTrade,
+  getJobTemplateById,
+} from "./mockQuote";
 
 describe("matchJobTemplate", () => {
   it("matches a bathroom job by keyword", () => {
@@ -33,6 +40,35 @@ describe("generateDemoQuote", () => {
       expect(quote.items.length).toBeGreaterThan(0);
       expect(quote.matchedJob).toBe(template.label);
     }
+  });
+});
+
+describe("trade-biased matching (used by /handwerker/[trade] demo)", () => {
+  it("prefers a trade's own templates even when text also weakly matches another", () => {
+    // "Wasserhahn" (sanitär) also loosely matches nothing else here, but this
+    // checks the painting trade page biases toward painting even for a
+    // generic description with no strong keyword hits.
+    const template = matchJobTemplate("Zimmer neu gestalten", ["painting"]);
+    expect(template.id).toBe("painting");
+  });
+
+  it("still matches a trade's own keyword within its preferred set", () => {
+    const template = matchJobTemplate("Bitte Wände streichen", ["painting"]);
+    expect(template.id).toBe("painting");
+  });
+
+  it("falls back across all templates if none of the preferred trade's templates match", () => {
+    const template = matchJobTemplate("Steckdosen und Lampen erneuern", ["painting"]);
+    expect(template.id).toBe("electrical");
+  });
+
+  it("getJobTemplatesForTrade returns templates in the given order", () => {
+    const templates = getJobTemplatesForTrade(["bathroom", "kitchen-faucet"]);
+    expect(templates.map((t) => t.id)).toEqual(["bathroom", "kitchen-faucet"]);
+  });
+
+  it("getJobTemplateById returns the matching template", () => {
+    expect(getJobTemplateById("flooring").label).toBe("Bodenbelag verlegen");
   });
 });
 
