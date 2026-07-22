@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { generateDemoQuote, formatCents, DEMO_JOB_TEMPLATES, type DemoQuote } from "@/lib/demo/mockQuote";
 
 const EXAMPLE_JOBS = [
@@ -14,6 +15,7 @@ export function QuoteDemo() {
   const [description, setDescription] = useState("");
   const [quote, setQuote] = useState<DemoQuote | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   function handleGenerate(text?: string) {
     const input = (text ?? description).trim();
@@ -30,7 +32,7 @@ export function QuoteDemo() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 rounded-2xl border border-[#e9edf2] bg-white p-6 shadow-sm sm:p-8">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 rounded-3xl border border-[#e9edf2] bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04),0_20px_48px_rgba(15,23,42,0.08)] sm:p-8">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="demo-description" className="text-sm font-medium text-[#0f172a]">
           Auftragsbeschreibung
@@ -42,7 +44,7 @@ export function QuoteDemo() {
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           placeholder="Beschreibe den Auftrag, z. B. Badezimmer renovieren, Dusche und Fliesen erneuern"
-          className="w-full rounded-xl border border-[#e9edf2] p-3 text-base text-[#0f172a] placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:outline-none"
+          className="w-full rounded-xl border border-[#e9edf2] p-3 text-base text-[#0f172a] placeholder:text-[#94a3b8] transition focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)] focus:outline-none"
         />
       </div>
       <div className="flex flex-wrap gap-2">
@@ -51,27 +53,34 @@ export function QuoteDemo() {
             key={job}
             type="button"
             onClick={() => handleGenerate(job)}
-            className="rounded-full border border-[#e9edf2] bg-[#f4f6f8] px-3 py-1.5 text-xs font-medium text-[#64748b] transition hover:border-[#2563eb] hover:text-[#2563eb]"
+            className="rounded-full border border-[#e9edf2] bg-[#f4f6f8] px-3 py-1.5 text-xs font-medium text-[#64748b] transition hover:border-[#2563eb] hover:text-[#2563eb] hover:-translate-y-0.5"
           >
             {job}
           </button>
         ))}
       </div>
-      <button
+      <motion.button
         type="button"
         onClick={() => handleGenerate()}
         disabled={isGenerating || !description.trim()}
-        className="self-center rounded-full bg-[#2563eb] px-6 py-3 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition hover:not-disabled:bg-[#1d4ed8] disabled:opacity-50"
+        whileHover={shouldReduceMotion || isGenerating ? undefined : { scale: 1.03 }}
+        whileTap={shouldReduceMotion || isGenerating ? undefined : { scale: 0.98 }}
+        className="self-center rounded-full bg-gradient-to-r from-blue-500 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition disabled:opacity-50"
       >
         {isGenerating ? "Angebot wird erstellt…" : "Demo-Angebot erstellen"}
-      </button>
+      </motion.button>
       <p className="text-center text-xs text-[#94a3b8]">
         Diese Demo läuft komplett in deinem Browser mit Beispieldaten. Keine echte KI-Anfrage,
         kein Konto nötig.
       </p>
 
+      <AnimatePresence>
       {quote && (
-        <div className="flex flex-col gap-4 rounded-xl border border-[#e9edf2] bg-[#f4f6f8] p-4 sm:p-6">
+        <motion.div
+          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="flex flex-col gap-4 rounded-xl border border-[#e9edf2] bg-[#f4f6f8] p-4 sm:p-6">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
               Erkannter Auftrag
@@ -116,13 +125,14 @@ export function QuoteDemo() {
             </p>
             <Link
               href="/login"
-              className="rounded-full bg-[#2563eb] px-6 py-3 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition hover:bg-[#1d4ed8]"
+              className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition hover:from-blue-400 hover:to-blue-600"
             >
               Jetzt kostenlos starten
             </Link>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
