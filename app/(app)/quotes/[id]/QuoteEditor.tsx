@@ -10,6 +10,7 @@ import type { ContractInterval } from "@/lib/contracts/interval";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { computeProfitability } from "@/lib/quotes/profitability";
 import { PhotosSection } from "./PhotosSection";
+import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
 
 type LineItem = {
@@ -31,6 +32,8 @@ type Quote = {
   vat_cents: number;
   total_cents: number;
   share_token: string;
+  gallery_token: string;
+  gallery_enabled: boolean;
   declined_at: string | null;
   decline_reason: string | null;
   assigned_to: string | null;
@@ -421,6 +424,13 @@ export function QuoteEditor({
         quoteId={quote.id}
         lineItems={items.map((item) => ({ id: item.id, description: item.description }))}
         photos={photos}
+      />
+
+      <GallerySection
+        quoteId={quote.id}
+        galleryToken={quote.gallery_token}
+        initialEnabled={quote.gallery_enabled}
+        hasPhotos={photos.length > 0}
       />
     </div>
   );
