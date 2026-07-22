@@ -6,6 +6,8 @@ import { getOnboardingChecklistState } from "@/lib/organizations/getOnboardingCh
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
 import { QUOTES_DICTIONARY } from "./quotes.dictionary";
+import { isStalledQuote, daysSinceFinalized } from "@/lib/quotes/followup";
+import { StalledQuotesSection, type StalledQuote } from "./StalledQuotesSection";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -62,6 +64,34 @@ export default async function QuotesPage({
   const finalSignedCount = allQuotes.filter(
     (q) => q.status === "final" || q.status === "signed",
   ).length;
+
+  // Stalled-quotes follow-up nudges (issue #158): quotes sent (status =
+  // "final") but neither signed nor declined for a while. Read-only query
+  // reusing existing status/timestamp columns -- see lib/quotes/followup.ts.
+  const { data: candidateStalledQuotes, error: stalledError } = await supabase
+    .from("quotes")
+    .select("id, customer_description, status, declined_at, signed_at, finalized_at")
+    .eq("status", "final")
+    .is("declined_at", null)
+    .is("signed_at", null)
+    .not("finalized_at", "is", null)
+    .order("finalized_at", { ascending: true });
+  if (stalledError) {
+    console.error("Failed to load stalled quotes:", stalledError);
+  }
+  const now = new Date();
+  const stalledQuotes: StalledQuote[] = (candidateStalledQuotes ?? [])
+    .filter((q) =>
+      isStalledQuote(
+        { status: q.status, declinedAt: q.declined_at, signedAt: q.signed_at, finalizedAt: q.finalized_at },
+        now,
+      ),
+    )
+    .map((q) => ({
+      id: q.id,
+      customerDescription: q.customer_description,
+      daysSinceSent: daysSinceFinalized(new Date(q.finalized_at as string), now),
+    }));
 
   const checklistState = await getOnboardingChecklistState(supabase);
   const language = await getUserLanguage(supabase);
@@ -130,6 +160,8 @@ export default async function QuotesPage({
       </div>
 
       <OnboardingChecklist state={checklistState} />
+
+      <StalledQuotesSection quotes={stalledQuotes} />
 
       {upcomingJobs.length > 0 && (
         <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-4">
