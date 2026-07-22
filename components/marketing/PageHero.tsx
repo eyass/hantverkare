@@ -1,7 +1,4 @@
-"use client";
-
-import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import type { CSSProperties, ReactNode } from "react";
 import { GradientBackdrop } from "./GradientBackdrop";
 
 type PageHeroProps = {
@@ -16,10 +13,17 @@ type PageHeroProps = {
  * Shared dark, gradient-mesh hero band used at the top of every marketing
  * page for visual consistency (Home gets the full version with actions,
  * inner pages use `compact` for a shorter band).
+ *
+ * The badge/h1/description/actions fade+slide in on mount using plain CSS
+ * `@keyframes` (see `.hero-fade-in` in `app/globals.css`) rather than
+ * framer-motion. This content is above-the-fold and must render visible
+ * immediately on load — a CSS animation has no dependency on React state,
+ * JS timers, or animation-library internals, so it cannot get stuck at
+ * `opacity: 0` the way the previous framer-motion `initial`/`animate`
+ * mount animation did. `prefers-reduced-motion: reduce` disables the
+ * animation entirely via a media query in globals.css.
  */
 export function PageHero({ eyebrow, title, description, children, compact }: PageHeroProps) {
-  const shouldReduceMotion = useReducedMotion();
-
   return (
     <section className="relative overflow-hidden bg-[#020617]">
       <GradientBackdrop />
@@ -29,43 +33,35 @@ export function PageHero({ eyebrow, title, description, children, compact }: Pag
         }`}
       >
         {eyebrow && (
-          <motion.span
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-blue-200 backdrop-blur"
+          <span
+            className="hero-fade-in rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-blue-200 backdrop-blur"
+            style={{ "--hero-fade-offset": "-8px" } as CSSProperties}
           >
             {eyebrow}
-          </motion.span>
+          </span>
         )}
-        <motion.h1
-          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.05 }}
-          className={`font-semibold tracking-tight text-white ${
+        <h1
+          className={`hero-fade-in font-semibold tracking-tight text-white ${
             compact ? "text-3xl sm:text-4xl" : "text-4xl sm:text-6xl"
           }`}
+          style={{ "--hero-fade-delay": "0.05s" } as CSSProperties}
         >
           {title}
-        </motion.h1>
+        </h1>
         {description && (
-          <motion.p
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.12 }}
-            className={`max-w-2xl leading-8 text-slate-300 ${compact ? "text-base" : "text-lg sm:text-xl"}`}
+          <p
+            className={`hero-fade-in max-w-2xl leading-8 text-slate-300 ${
+              compact ? "text-base" : "text-lg sm:text-xl"
+            }`}
+            style={{ "--hero-fade-delay": "0.12s" } as CSSProperties}
           >
             {description}
-          </motion.p>
+          </p>
         )}
         {children && (
-          <motion.div
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
+          <div className="hero-fade-in" style={{ "--hero-fade-delay": "0.2s" } as CSSProperties}>
             {children}
-          </motion.div>
+          </div>
         )}
       </div>
     </section>
