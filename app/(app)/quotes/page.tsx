@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatExpiryBadge } from "@/lib/quotes/expiry";
+import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -14,6 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",
   final: "Final",
   signed: "Signiert",
+  declined: "Abgelehnt",
 };
 
 export default async function QuotesPage({
@@ -27,7 +29,7 @@ export default async function QuotesPage({
   const supabase = await createClient();
   let query = supabase
     .from("quotes")
-    .select("id, customer_description, status, total_cents, created_at, expires_at")
+    .select("id, customer_description, status, total_cents, created_at, expires_at, declined_at")
     .order("created_at", { ascending: false });
   if (statusFilter) {
     query = query.eq("status", statusFilter);
@@ -55,6 +57,7 @@ export default async function QuotesPage({
     draft: "bg-zinc-100 text-zinc-600",
     final: "bg-blue-50 text-blue-700",
     signed: "bg-[#dcfce7] text-[#16a34a]",
+    declined: "bg-[#fee2e2] text-[#b91c1c]",
   };
 
   const expiryBadgeClasses: Record<"neutral" | "warning" | "expired", string> = {
@@ -168,7 +171,7 @@ export default async function QuotesPage({
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                {quote.status === "final" && quote.expires_at ? (
+                {quote.status === "final" && !quote.declined_at && quote.expires_at ? (
                   (() => {
                     const badge = formatExpiryBadge(new Date(quote.expires_at));
                     return (
@@ -180,13 +183,21 @@ export default async function QuotesPage({
                     );
                   })()
                 ) : null}
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    statusBadgeClasses[quote.status] ?? "bg-zinc-100 text-zinc-600"
-                  }`}
-                >
-                  {STATUS_LABELS[quote.status] ?? quote.status}
-                </span>
+                {(() => {
+                  const displayStatus = computeQuoteDisplayStatus({
+                    status: quote.status,
+                    declinedAt: quote.declined_at,
+                  });
+                  return (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        statusBadgeClasses[displayStatus] ?? "bg-zinc-100 text-zinc-600"
+                      }`}
+                    >
+                      {STATUS_LABELS[displayStatus] ?? displayStatus}
+                    </span>
+                  );
+                })()}
                 <span className="font-mono text-sm font-semibold text-[#0f172a]">
                   {formatEuros(quote.total_cents)}
                 </span>

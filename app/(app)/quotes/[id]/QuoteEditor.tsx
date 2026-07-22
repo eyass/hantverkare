@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
+import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 
 type LineItem = {
   id: string;
@@ -23,6 +24,8 @@ type Quote = {
   vat_cents: number;
   total_cents: number;
   share_token: string;
+  declined_at: string | null;
+  decline_reason: string | null;
 };
 
 type Invoice = {
@@ -35,12 +38,14 @@ type Invoice = {
 };
 
 function statusLabel(status: string): string {
+  if (status === "declined") return "Abgelehnt";
   if (status === "final") return "Final";
   if (status === "signed") return "Signiert";
   return "Entwurf";
 }
 
 function statusBadgeClasses(status: string): string {
+  if (status === "declined") return "bg-[#fee2e2] text-[#b91c1c]";
   if (status === "final") return "bg-[#dbeafe] text-[#1d4ed8]";
   if (status === "signed") return "bg-[#dcfce7] text-[#16a34a]";
   return "bg-[#f1f5f9] text-[#64748b]";
@@ -70,6 +75,7 @@ export function QuoteEditor({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isDraft = status === "draft";
+  const displayStatus = computeQuoteDisplayStatus({ status, declinedAt: quote.declined_at });
 
   function handleFieldChange(
     itemId: string,
@@ -127,12 +133,17 @@ export function QuoteEditor({
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-[#0f172a]">Angebot</h1>
         <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClasses(status)}`}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClasses(displayStatus)}`}
         >
-          {statusLabel(status)}
+          {statusLabel(displayStatus)}
         </span>
       </div>
       <p className="text-[#64748b]">{quote.customer_description}</p>
+      {quote.declined_at && (
+        <p className="rounded-xl border border-[#fecaca] bg-red-50 px-4 py-2 text-sm text-[#b91c1c]">
+          Vom Kunden abgelehnt.{quote.decline_reason ? ` Grund: ${quote.decline_reason}` : ""}
+        </p>
+      )}
 
       {error && (
         <p className="rounded-xl border border-[#fecaca] bg-red-50 px-4 py-2 text-sm text-[#dc2626]">{error}</p>
