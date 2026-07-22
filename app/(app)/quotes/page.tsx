@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { formatExpiryBadge } from "@/lib/quotes/expiry";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -26,7 +27,7 @@ export default async function QuotesPage({
   const supabase = await createClient();
   let query = supabase
     .from("quotes")
-    .select("id, customer_description, status, total_cents, created_at")
+    .select("id, customer_description, status, total_cents, created_at, expires_at")
     .order("created_at", { ascending: false });
   if (statusFilter) {
     query = query.eq("status", statusFilter);
@@ -54,6 +55,12 @@ export default async function QuotesPage({
     draft: "bg-zinc-100 text-zinc-600",
     final: "bg-blue-50 text-blue-700",
     signed: "bg-[#dcfce7] text-[#16a34a]",
+  };
+
+  const expiryBadgeClasses: Record<"neutral" | "warning" | "expired", string> = {
+    neutral: "bg-zinc-100 text-zinc-600",
+    warning: "bg-[#fef3c7] text-[#b45309]",
+    expired: "bg-[#fee2e2] text-[#b91c1c]",
   };
 
   return (
@@ -161,6 +168,18 @@ export default async function QuotesPage({
                 </span>
               </div>
               <div className="flex items-center gap-3">
+                {quote.status === "final" && quote.expires_at ? (
+                  (() => {
+                    const badge = formatExpiryBadge(new Date(quote.expires_at));
+                    return (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${expiryBadgeClasses[badge.tone]}`}
+                      >
+                        {badge.label}
+                      </span>
+                    );
+                  })()
+                ) : null}
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                     statusBadgeClasses[quote.status] ?? "bg-zinc-100 text-zinc-600"

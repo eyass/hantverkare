@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
+import { computeExpiryDate } from "@/lib/quotes/expiry";
 
 type UpdateLineItemInput = {
   description: string;
@@ -193,9 +194,14 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
 export async function finalizeQuote(quoteId: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
 
+  const now = new Date();
   const { data, error } = await supabase
     .from("quotes")
-    .update({ status: "final", finalized_at: new Date().toISOString() })
+    .update({
+      status: "final",
+      finalized_at: now.toISOString(),
+      expires_at: computeExpiryDate(now).toISOString(),
+    })
     .eq("id", quoteId)
     .eq("status", "draft")
     .select("id");
