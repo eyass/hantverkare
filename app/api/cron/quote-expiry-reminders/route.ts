@@ -1,7 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendExpiryReminderEmail } from "@/lib/notifications/sendExpiryReminderEmail";
+import { sendSmsNotification, buildExpiryReminderSmsBody } from "@/lib/notifications/sendSmsNotification";
 import { daysUntilExpiry, REMINDER_WINDOW_DAYS } from "@/lib/quotes/expiry";
 
+// Excludes declined quotes (declined_at is not null, see 0017_quote_decline.sql)
+// -- once a customer has explicitly declined, they should never keep getting
+// nudged to sign a quote they've already turned down.
+//
 // Vercel Cron (see vercel.json's `crons` entry) hits this route on a schedule
 // with no user session at all, so it must use the service-role admin client
 // (see lib/supabase/admin.ts) to read/write across every organization's
@@ -40,9 +45,10 @@ export async function GET(request: Request): Promise<Response> {
 
   const { data: quotes, error } = await supabase
     .from("quotes")
-    .select("id, user_id, customer_id, customer_description, expires_at, share_token")
+    .select("id, user_id, customer_id, customer_description, expires_at, share_token, organization_id")
     .eq("status", "final")
     .is("expiry_reminder_sent_at", null)
+    .is("declined_at", null)
     .not("expires_at", "is", null)
     .gte("expires_at", now.toISOString())
     .lte("expires_at", windowEnd.toISOString());
@@ -58,6 +64,21 @@ export async function GET(request: Request): Promise<Response> {
   for (const quote of quotes ?? []) {
     try {
       const days = daysUntilExpiry(new Date(quote.expires_at as string), now);
+
+      // Best-effort SMS is gated on the org's opt-in toggle (see
+      // organizations.sms_notifications_enabled, 0016_sms_notifications.sql).
+      // Looked up once per quote and reused for both owner and customer sends.
+      let smsEnabled = false;
+      const { data: orgRow, error: orgError } = await supabase
+        .from("organizations")
+        .select("sms_notifications_enabled")
+        .eq("id", quote.organization_id)
+        .maybeSingle();
+      if (orgError) {
+        console.error("Failed to look up organization SMS setting:", quote.id, orgError);
+      } else {
+        smsEnabled = orgRow?.sms_notifications_enabled === true;
+      }
 
       const { data: ownerData, error: ownerError } = await supabase.auth.admin.getUserById(
         quote.user_id,
@@ -75,23 +96,39 @@ export async function GET(request: Request): Promise<Response> {
         });
       }
 
+      const ownerPhone = ownerData?.user?.phone;
+      if (smsEnabled && ownerPhone) {
+        await sendSmsNotification({
+          toPhone: ownerPhone,
+          body: buildExpiryReminderSmsBody("owner", days, quote.customer_description ?? ""),
+        });
+      }
+
       if (quote.customer_id) {
         const { data: customer, error: customerError } = await supabase
           .from("customers")
-          .select("email")
+          .select("email, phone")
           .eq("id", quote.customer_id)
           .maybeSingle();
         if (customerError) {
           console.error("Failed to look up customer for expiry reminder:", quote.id, customerError);
-        } else if (customer?.email) {
-          await sendExpiryReminderEmail({
-            toEmail: customer.email,
-            audience: "customer",
-            quoteDescription: quote.customer_description ?? "",
-            quoteId: quote.id,
-            daysUntilExpiry: days,
-            shareToken: quote.share_token as string | undefined,
-          });
+        } else {
+          if (customer?.email) {
+            await sendExpiryReminderEmail({
+              toEmail: customer.email,
+              audience: "customer",
+              quoteDescription: quote.customer_description ?? "",
+              quoteId: quote.id,
+              daysUntilExpiry: days,
+              shareToken: quote.share_token as string | undefined,
+            });
+          }
+          if (smsEnabled && customer?.phone) {
+            await sendSmsNotification({
+              toPhone: customer.phone,
+              body: buildExpiryReminderSmsBody("customer", days, quote.customer_description ?? ""),
+            });
+          }
         }
       }
 

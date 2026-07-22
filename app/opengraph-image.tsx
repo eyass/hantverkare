@@ -19,7 +19,7 @@ export default async function Image() {
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
-          background: "#020617",
+          background: "#ffffff",
           fontFamily: "sans-serif",
         }}
       >
@@ -29,7 +29,7 @@ export default async function Image() {
             inset: 0,
             display: "flex",
             background:
-              "radial-gradient(circle at 20% 20%, rgba(96,165,250,0.35), transparent 55%), radial-gradient(circle at 85% 75%, rgba(29,78,216,0.45), transparent 55%)",
+              "radial-gradient(circle at 20% 20%, rgba(96,165,250,0.28), transparent 55%), radial-gradient(circle at 85% 75%, rgba(37,99,235,0.18), transparent 55%)",
           }}
         />
         <div
@@ -70,7 +70,7 @@ export default async function Image() {
             style={{
               fontSize: 88,
               fontWeight: 600,
-              color: "white",
+              color: "#0f172a",
               letterSpacing: "-0.02em",
             }}
           >
@@ -82,7 +82,7 @@ export default async function Image() {
             position: "relative",
             marginTop: 28,
             fontSize: 32,
-            color: "#94a3b8",
+            color: "#64748b",
             maxWidth: 880,
             textAlign: "center",
           }}

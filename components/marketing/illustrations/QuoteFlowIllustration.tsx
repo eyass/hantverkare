@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 /**
  * Original abstract SVG illustration of the quote-generation flow: a
  * stylized document with line items that animate in one after another,
- * plus a small orbiting "AI" spark. Purely decorative, on-brand navy/blue.
+ * plus a small orbiting "AI" spark. Purely decorative, on-brand light/blue.
  */
 export function QuoteFlowIllustration({ className = "" }: { className?: string }) {
   const shouldReduceMotion = useReducedMotion();
@@ -52,8 +52,8 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
     >
       <defs>
         <linearGradient id="qfi-card" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#1e293b" />
-          <stop offset="100%" stopColor="#0f172a" />
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#eff6ff" />
         </linearGradient>
         <linearGradient id="qfi-accent" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#60a5fa" />
@@ -70,7 +70,7 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
       {shouldReduceMotion ? (
         <g>
           <rect x="40" y="30" width="280" height="260" rx="24" fill="url(#qfi-card)" />
-          <rect x="40" y="30" width="280" height="260" rx="24" stroke="#334155" strokeOpacity="0.6" />
+          <rect x="40" y="30" width="280" height="260" rx="24" stroke="#cbd5e1" strokeOpacity="0.8" />
 
           {/* Header line */}
           <rect x="68" y="62" width="120" height="12" rx="6" fill="#94a3b8" opacity="0.6" />
@@ -98,7 +98,7 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
             </g>
           ))}
 
-          <rect x="68" y="266" width="228" height="2" fill="#334155" />
+          <rect x="68" y="266" width="228" height="2" fill="#cbd5e1" />
         </g>
       ) : (
         <motion.g
@@ -107,7 +107,7 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         >
           <rect x="40" y="30" width="280" height="260" rx="24" fill="url(#qfi-card)" />
-          <rect x="40" y="30" width="280" height="260" rx="24" stroke="#334155" strokeOpacity="0.6" />
+          <rect x="40" y="30" width="280" height="260" rx="24" stroke="#cbd5e1" strokeOpacity="0.8" />
 
           {/* Header line */}
           <rect x="68" y="62" width="120" height="12" rx="6" fill="#94a3b8" opacity="0.6" />
@@ -155,7 +155,7 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
             y="266"
             width="228"
             height="2"
-            fill="#334155"
+            fill="#cbd5e1"
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
             transition={{ duration: 0.6, delay: 2 }}

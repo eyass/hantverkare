@@ -79,7 +79,7 @@ export default function Home() {
             </Link>
             <Link
               href="/tool"
-              className="rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
+              className="rounded-xl border border-[#e2e8f0] bg-white/70 px-6 py-3 text-sm font-medium text-[#0f172a] backdrop-blur transition hover:bg-white"
             >
               So funktioniert&apos;s
             </Link>
@@ -90,19 +90,19 @@ export default function Home() {
         </div>
       </PageHero>
 
-      <section className="relative overflow-hidden bg-[#020617] py-10 sm:py-14">
+      <section className="relative overflow-hidden bg-[#f8fafc] py-10 sm:py-14">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.18),transparent_60%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.08),transparent_60%)]"
         />
         <AnimatedSection className="relative mx-auto max-w-6xl px-4 sm:px-8">
-          <div className="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur sm:grid-cols-3 sm:p-10">
+          <div className="grid gap-6 rounded-3xl border border-[#e9edf2] bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:grid-cols-3 sm:p-10">
             {STATS.map((stat) => (
               <div key={stat.label} className="flex flex-col items-center gap-1 text-center">
-                <span className="mono text-2xl font-semibold text-white sm:text-3xl">
+                <span className="mono text-2xl font-semibold text-[#0f172a] sm:text-3xl">
                   {stat.value}
                 </span>
-                <span className="text-sm text-slate-300">{stat.label}</span>
+                <span className="text-sm text-[#64748b]">{stat.label}</span>
               </div>
             ))}
           </div>
@@ -140,16 +140,16 @@ export default function Home() {
       </section>
 
       <AnimatedSection className="mx-auto max-w-6xl px-4 pb-20 sm:px-8">
-        <div className="relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl bg-[#020617] p-8 text-center shadow-[0_24px_64px_rgba(2,6,23,0.35)] sm:p-14">
+        <div className="relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-blue-50 p-8 text-center shadow-[0_16px_48px_rgba(37,99,235,0.1)] sm:p-14">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.25),transparent_60%),radial-gradient(circle_at_80%_80%,rgba(29,78,216,0.35),transparent_55%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.18),transparent_60%),radial-gradient(circle_at_80%_80%,rgba(37,99,235,0.14),transparent_55%)]"
           />
           <div className="relative flex flex-col items-center gap-4">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            <h2 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
               Bereit, weniger Zeit mit Angeboten zu verbringen?
             </h2>
-            <p className="max-w-xl text-base leading-7 text-slate-300">
+            <p className="max-w-xl text-base leading-7 text-[#475569]">
               14 Tage kostenlos testen, danach 29 €/Monat. Jederzeit kündbar.
             </p>
             <Link
