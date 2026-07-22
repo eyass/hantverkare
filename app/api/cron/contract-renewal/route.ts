@@ -20,6 +20,27 @@ import { VAT_RATE } from "@/lib/quotes/pricing";
 // moment here -- generating the next period's quote is the entire feature.
 // A human still needs to open the new draft and finalize/send it themselves,
 // same as any other draft quote in the quotes list.
+//
+// Renewal-failure tracking (issue #153): every failure path below now also
+// best-effort stamps contracts.renewal_failed_at, and the success path
+// stamps latest_quote_id and clears renewal_failed_at. This is what lets
+// app/api/cron/contract-dunning/route.ts (and the /contracts list) surface
+// "this contract stopped renewing" as a risk signal -- see
+// lib/contracts/dunning.ts for the read-time logic. Stamping is
+// best-effort and never itself counted against `failed`/`renewed`: a failed
+// stamp write must not mask or double-count the underlying renewal outcome.
+async function markRenewalFailed(
+  supabase: ReturnType<typeof createAdminClient>,
+  contractId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("contracts")
+    .update({ renewal_failed_at: new Date().toISOString() })
+    .eq("id", contractId);
+  if (error) {
+    console.error("Failed to stamp renewal_failed_at for contract:", contractId, error);
+  }
+}
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -58,6 +79,7 @@ export async function GET(request: Request): Promise<Response> {
     try {
       if (!isValidContractInterval(contract.interval)) {
         console.error("Contract has an invalid interval, skipping:", contract.id, contract.interval);
+        await markRenewalFailed(supabase, contract.id);
         failed += 1;
         continue;
       }
@@ -69,6 +91,7 @@ export async function GET(request: Request): Promise<Response> {
         .maybeSingle();
       if (sourceQuoteError || !sourceQuote) {
         console.error("Failed to load source quote for contract:", contract.id, sourceQuoteError);
+        await markRenewalFailed(supabase, contract.id);
         failed += 1;
         continue;
       }
@@ -80,6 +103,7 @@ export async function GET(request: Request): Promise<Response> {
         .order("position");
       if (sourceLineItemsError || !sourceLineItems) {
         console.error("Failed to load source line items for contract:", contract.id, sourceLineItemsError);
+        await markRenewalFailed(supabase, contract.id);
         failed += 1;
         continue;
       }
@@ -108,6 +132,7 @@ export async function GET(request: Request): Promise<Response> {
         .single();
       if (newQuoteError || !newQuote) {
         console.error("Failed to create renewal quote for contract:", contract.id, newQuoteError);
+        await markRenewalFailed(supabase, contract.id);
         failed += 1;
         continue;
       }
@@ -131,6 +156,7 @@ export async function GET(request: Request): Promise<Response> {
         // Best-effort cleanup so a failed renewal doesn't leave an empty quote
         // behind, mirroring generateQuoteDraft's own rollback-on-failure.
         await supabase.from("quotes").delete().eq("id", newQuote.id);
+        await markRenewalFailed(supabase, contract.id);
         failed += 1;
         continue;
       }
@@ -141,11 +167,14 @@ export async function GET(request: Request): Promise<Response> {
         .update({
           next_due_date: nextDueDate.toISOString().slice(0, 10),
           updated_at: new Date().toISOString(),
+          latest_quote_id: newQuote.id,
+          renewal_failed_at: null,
         })
         .eq("id", contract.id)
         .eq("next_due_date", contract.next_due_date);
       if (advanceError) {
         console.error("Failed to advance next_due_date for contract:", contract.id, advanceError);
+        await markRenewalFailed(supabase, contract.id);
         failed += 1;
         continue;
       }

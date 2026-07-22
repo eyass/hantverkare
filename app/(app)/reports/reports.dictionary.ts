@@ -2,6 +2,14 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 
 export type ReportsCopy = {
   title: string;
+  rangeThisMonth: string;
+  rangeLastMonth: string;
+  rangeThisQuarter: string;
+  rangeThisYear: string;
+  rangeCustom: string;
+  rangeCustomFrom: string;
+  rangeCustomTo: string;
+  rangeCustomApply: string;
   tileTotalQuotes: string;
   tileDraft: string;
   tileFinal: string;
@@ -20,6 +28,14 @@ export type ReportsCopy = {
 export const REPORTS_DICTIONARY: Dictionary<ReportsCopy> = {
   de: {
     title: "Auswertung",
+    rangeThisMonth: "Dieser Monat",
+    rangeLastMonth: "Letzter Monat",
+    rangeThisQuarter: "Dieses Quartal",
+    rangeThisYear: "Dieses Jahr",
+    rangeCustom: "Benutzerdefiniert",
+    rangeCustomFrom: "Von",
+    rangeCustomTo: "Bis",
+    rangeCustomApply: "Anwenden",
     tileTotalQuotes: "Angebote insgesamt",
     tileDraft: "Entwurf",
     tileFinal: "Final",
@@ -38,6 +54,14 @@ export const REPORTS_DICTIONARY: Dictionary<ReportsCopy> = {
   },
   en: {
     title: "Reports",
+    rangeThisMonth: "This month",
+    rangeLastMonth: "Last month",
+    rangeThisQuarter: "This quarter",
+    rangeThisYear: "This year",
+    rangeCustom: "Custom",
+    rangeCustomFrom: "From",
+    rangeCustomTo: "To",
+    rangeCustomApply: "Apply",
     tileTotalQuotes: "Total quotes",
     tileDraft: "Draft",
     tileFinal: "Final",
