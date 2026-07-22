@@ -20,6 +20,7 @@ function buildNavItems(t: (typeof APP_SHELL_DICTIONARY)["de"]): {
     base: [
       { href: "/quotes", label: t.nav.quotes },
       { href: "/schedule", label: t.nav.schedule },
+      { href: "/jobs", label: t.nav.myJobs },
       { href: "/customers", label: t.nav.customers },
       { href: "/price-list", label: t.nav.priceList },
       { href: "/quote-templates", label: t.nav.quoteTemplates },

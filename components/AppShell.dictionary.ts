@@ -4,6 +4,7 @@ export type AppShellCopy = {
   nav: {
     quotes: string;
     schedule: string;
+    myJobs: string;
     customers: string;
     priceList: string;
     quoteTemplates: string;
@@ -21,6 +22,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
     nav: {
       quotes: "Angebote",
       schedule: "Termine",
+      myJobs: "Meine Jobs",
       customers: "Kunden",
       priceList: "Preisliste",
       quoteTemplates: "Vorlagen",
@@ -36,6 +38,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
     nav: {
       quotes: "Quotes",
       schedule: "Schedule",
+      myJobs: "My jobs",
       customers: "Customers",
       priceList: "Price list",
       quoteTemplates: "Templates",
