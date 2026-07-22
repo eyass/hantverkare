@@ -522,6 +522,23 @@ possible (same email rate-limit blocker as above). Please eyeball:
 - [x] "Leer starten" goes straight to the existing manual editor.
 - [x] `/price-list` with existing items shows the normal editor, no wizard.
 
+## Team permissions (issue #52) — migration pending
+
+- [ ] Apply migration `supabase/migrations/0014_team_permissions.sql` in the Supabase
+  SQL editor (after 0010; independent of 0012/0013 from other in-flight work). Adds
+  3 boolean columns to `organizations` (`members_can_delete_customers`,
+  `members_can_view_billing`, `members_can_edit_business_settings`, all default
+  `true`, i.e. unchanged from today's behavior) plus 3 SECURITY DEFINER helper
+  functions and updated RLS policies on `customers` (delete), `business_settings`
+  (insert/update), and `invoices` (select). The `billing` (Stripe subscription) table
+  is untouched and stays hardcoded owner-only.
+- [ ] Visual QA: `/settings/team` as an owner — toggle each of the 3 new checkboxes off,
+  confirm as a `member` user in another session that: deleting a customer now shows
+  "Nur der Inhaber kann Kunden löschen.", the invoice section on `/quotes/[id]` no
+  longer shows for that org's invoices, and saving `/settings` (business settings)
+  shows "Nur der Inhaber kann die Unternehmenseinstellungen bearbeiten." Then toggle
+  back on and confirm those actions work again.
+
 ## Quote expiry + reminder emails (T2, issue #49) — human setup required
 
 - [ ] Apply migration `0013_quote_expiry.sql` in the Supabase SQL editor (after
