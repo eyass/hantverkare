@@ -82,3 +82,19 @@ export function buildExpiryReminderSmsBody(
     ? `Ihr Angebot an einen Kunden läuft ${when} ab und wurde noch nicht signiert. Auftrag: ${descriptionSnippet}`
     : `Ihr Angebot läuft ${when} ab. Bitte prüfen und signieren Sie es rechtzeitig. Auftrag: ${descriptionSnippet}`;
 }
+
+/** Builds the SMS body for each stage of the automated Mahnwesen sequence (issue #122). */
+export function buildDunningSmsBody(
+  stage: "reminder" | "mahnung" | "escalation",
+  invoiceNumber: string,
+  totalCents: number,
+): string {
+  const amount = (totalCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  if (stage === "reminder") {
+    return `Zahlungserinnerung: Rechnung ${invoiceNumber} über ${amount} ist noch offen. Bitte prüfen Sie den Zahlungseingang.`;
+  }
+  if (stage === "mahnung") {
+    return `Mahnung: Rechnung ${invoiceNumber} über ${amount} ist überfällig. Es fallen Verzugszinsen an. Bitte zeitnah begleichen.`;
+  }
+  return `Letzte Mahnung: Rechnung ${invoiceNumber} über ${amount} weiterhin unbeglichen. Bitte umgehend begleichen, sonst drohen weitere Schritte.`;
+}

@@ -5,6 +5,11 @@ export type OrgPermissionSettings = {
   membersCanViewBilling: boolean;
   membersCanEditBusinessSettings: boolean;
   smsNotificationsEnabled: boolean;
+  dunningEnabled: boolean;
+  dunningReminderDays: number;
+  dunningMahnungDays: number;
+  dunningEscalationDays: number;
+  dunningTone: "freundlich" | "neutral" | "streng";
 };
 
 /**
@@ -23,7 +28,7 @@ export async function getOrgSettings(
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "members_can_delete_customers, members_can_view_billing, members_can_edit_business_settings, sms_notifications_enabled",
+      "members_can_delete_customers, members_can_view_billing, members_can_edit_business_settings, sms_notifications_enabled, dunning_enabled, dunning_reminder_days, dunning_mahnung_days, dunning_escalation_days, dunning_tone",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -38,5 +43,10 @@ export async function getOrgSettings(
     membersCanViewBilling: data.members_can_view_billing,
     membersCanEditBusinessSettings: data.members_can_edit_business_settings,
     smsNotificationsEnabled: data.sms_notifications_enabled,
+    dunningEnabled: data.dunning_enabled,
+    dunningReminderDays: data.dunning_reminder_days,
+    dunningMahnungDays: data.dunning_mahnung_days,
+    dunningEscalationDays: data.dunning_escalation_days,
+    dunningTone: data.dunning_tone,
   };
 }
