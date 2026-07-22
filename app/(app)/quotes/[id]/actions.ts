@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
@@ -362,5 +363,77 @@ export async function deleteQuotePhoto(photoId: string): Promise<{ error: string
     return { error: "Foto konnte nicht gelöscht werden." };
   }
 
+  return { error: null };
+}
+
+/**
+ * Assigns a job/quote to an org member, or clears the assignment when
+ * assigneeUserId is null (issue #128).
+ *
+ * This is purely a label on top of the existing org-membership RLS on
+ * `quotes` (see 0020_job_assignment.sql) -- it does not grant or restrict
+ * anyone's view/edit access, which stays governed by is_org_member as before.
+ * What this action DOES enforce server-side:
+ *   1. the caller must belong to an organization (any member, not owner-only
+ *      -- assigning a helper to a job is an ordinary editing action, same
+ *      bar as updateLineItem/finalizeQuote elsewhere in this file);
+ *   2. the target quote must belong to the caller's org (never trust a
+ *      client-supplied quoteId blindly -- RLS would reject the update anyway,
+ *      but returning a clear error here is better UX than a silent no-op);
+ *   3. the assignee, if any, must themselves be a member of that same org --
+ *      same "server validates the target membership" pattern as
+ *      settings/team/actions.ts's removeMember, so a client can't wire a job
+ *      up to an arbitrary user id from another organization entirely.
+ */
+export async function assignQuote(
+  quoteId: string,
+  assigneeUserId: string | null,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+
+  if (assigneeUserId !== null) {
+    const { data: membership } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", org.organizationId)
+      .eq("user_id", assigneeUserId)
+      .maybeSingle();
+    if (!membership) {
+      return { error: "Person ist kein Mitglied dieses Unternehmens." };
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({ assigned_to: assigneeUserId })
+    .eq("id", quoteId);
+  if (updateError) {
+    console.error("Failed to assign quote:", updateError);
+    return { error: "Zuweisung konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  revalidatePath("/jobs");
   return { error: null };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateLineItem, finalizeQuote } from "./actions";
+import { updateLineItem, finalizeQuote, assignQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
 import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
@@ -31,6 +31,13 @@ type Quote = {
   share_token: string;
   declined_at: string | null;
   decline_reason: string | null;
+  assigned_to: string | null;
+};
+
+type Member = {
+  userId: string;
+  email: string;
+  role: "owner" | "member";
 };
 
 type Invoice = {
@@ -89,6 +96,7 @@ export function QuoteEditor({
   photos,
   warranty,
   scheduledJob,
+  members,
 }: {
   quote: Quote;
   lineItems: LineItem[];
@@ -96,6 +104,7 @@ export function QuoteEditor({
   photos: Photo[];
   warranty: WarrantyRecord | null;
   scheduledJob: ScheduledJob | null;
+  members: Member[];
 }) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
@@ -107,6 +116,8 @@ export function QuoteEditor({
   const [status, setStatus] = useState(quote.status);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [assignedTo, setAssignedTo] = useState(quote.assigned_to);
+  const [isAssignPending, startAssignTransition] = useTransition();
   const isDraft = status === "draft";
   const displayStatus = computeQuoteDisplayStatus({ status, declinedAt: quote.declined_at });
   const profitability = computeProfitability(
@@ -158,6 +169,21 @@ export function QuoteEditor({
     });
   }
 
+  function handleAssign(nextUserId: string) {
+    const previous = assignedTo;
+    const nextValue = nextUserId === "" ? null : nextUserId;
+    setAssignedTo(nextValue);
+    startAssignTransition(async () => {
+      const result = await assignQuote(quote.id, nextValue);
+      if (result.error) {
+        setAssignedTo(previous);
+        setError(result.error);
+        return;
+      }
+      setError(null);
+    });
+  }
+
   function handleFinalize() {
     startTransition(async () => {
       const result = await finalizeQuote(quote.id);
@@ -185,6 +211,28 @@ export function QuoteEditor({
         <p className="rounded-xl border border-[#fecaca] bg-red-50 px-4 py-2 text-sm text-[#b91c1c]">
           Vom Kunden abgelehnt.{quote.decline_reason ? ` Grund: ${quote.decline_reason}` : ""}
         </p>
+      )}
+
+      {members.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e9edf2] bg-white px-4 py-3">
+          <label htmlFor="assign-to" className="text-sm font-medium text-[#0f172a]">
+            Zugewiesen an
+          </label>
+          <select
+            id="assign-to"
+            value={assignedTo ?? ""}
+            disabled={isAssignPending}
+            onChange={(e) => handleAssign(e.target.value)}
+            className="rounded-md border border-[#e9edf2] px-3 py-2 text-sm disabled:opacity-50"
+          >
+            <option value="">Niemand</option>
+            {members.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.email}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {error && (

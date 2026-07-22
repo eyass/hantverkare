@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { getOrgSettings } from "@/lib/organizations/getOrgSettings";
+import { getOrgMembers } from "@/lib/organizations/getOrgMembers";
 import { canManageTeam } from "@/lib/organizations/permissions";
 import { TeamSettingsForm, type TeamMember, type PendingInvite } from "./TeamSettingsForm";
 
@@ -25,24 +26,7 @@ export default async function TeamSettingsPage() {
   // (never exposed to the browser).
   const admin = createAdminClient();
 
-  const { data: memberRows, error: membersError } = await admin
-    .from("organization_members")
-    .select("user_id, role, created_at")
-    .eq("organization_id", org.organizationId)
-    .order("created_at", { ascending: true });
-  if (membersError) {
-    console.error("Failed to load organization members:", membersError);
-  }
-
-  const members: TeamMember[] = [];
-  for (const row of memberRows ?? []) {
-    const { data: memberUser } = await admin.auth.admin.getUserById(row.user_id);
-    members.push({
-      userId: row.user_id,
-      email: memberUser?.user?.email ?? "(unbekannt)",
-      role: row.role as "owner" | "member",
-    });
-  }
+  const members: TeamMember[] = await getOrgMembers(admin, org.organizationId);
 
   const { data: inviteRows, error: invitesError } = await admin
     .from("organization_invites")

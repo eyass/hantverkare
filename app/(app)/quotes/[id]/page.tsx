@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { getOrgMembers } from "@/lib/organizations/getOrgMembers";
 import { QuoteEditor } from "./QuoteEditor";
 import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 
@@ -12,11 +15,17 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const { data: quote } = await supabase
     .from("quotes")
     .select(
-      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, share_token, declined_at, decline_reason",
+      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, share_token, declined_at, decline_reason, assigned_to",
     )
     .eq("id", id)
     .single();
   if (!quote) notFound();
+
+  // Members list for the "assign to" selector (issue #128). Emails require
+  // the admin client (see getOrgMembers); the assign action itself still
+  // re-validates membership server-side, this is just for the dropdown.
+  const org = await getCurrentOrg(supabase);
+  const members = org ? await getOrgMembers(createAdminClient(), org.organizationId) : [];
 
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
@@ -74,6 +83,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       photos={photos}
       warranty={warranty ?? null}
       scheduledJob={scheduledJob ?? null}
+      members={members}
     />
   );
 }
