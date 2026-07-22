@@ -8,6 +8,7 @@ import { shouldGateAccess } from "@/lib/billing/gating";
 import { ensureOrganization } from "@/lib/organizations/ensureOrganization";
 import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
 import { AppLanguageProvider } from "@/lib/i18n/AppLanguageProvider";
+import { FieldModeProvider } from "@/lib/field-mode/FieldModeProvider";
 
 export default async function AuthenticatedLayout({
   children,
@@ -104,9 +105,11 @@ export default async function AuthenticatedLayout({
 
   return (
     <AppLanguageProvider initialLanguage={initialLanguage}>
-      <AppShell email={user.email ?? ""} role={org.role} signOutAction={signOut}>
-        {children}
-      </AppShell>
+      <FieldModeProvider>
+        <AppShell email={user.email ?? ""} role={org.role} signOutAction={signOut}>
+          {children}
+        </AppShell>
+      </FieldModeProvider>
     </AppLanguageProvider>
   );
 }
