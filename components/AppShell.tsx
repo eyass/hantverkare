@@ -22,6 +22,7 @@ function buildNavItems(t: (typeof APP_SHELL_DICTIONARY)["de"]): {
       { href: "/customers", label: t.nav.customers },
       { href: "/price-list", label: t.nav.priceList },
       { href: "/quote-templates", label: t.nav.quoteTemplates },
+      { href: "/invoices", label: t.nav.invoices },
       { href: "/reports", label: t.nav.reports },
       { href: "/settings", label: t.nav.settings },
     ],
