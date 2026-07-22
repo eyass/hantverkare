@@ -514,3 +514,28 @@ possible (same email rate-limit blocker as above). Please eyeball:
 - [x] "Zurück" returns to the trade picker without losing template data.
 - [x] "Leer starten" goes straight to the existing manual editor.
 - [x] `/price-list` with existing items shows the normal editor, no wizard.
+
+## Two-factor authentication (2FA) (T3 — auth, issue #54) — manual QA required
+
+Optional TOTP-based 2FA on top of magic-link login (`app/(app)/settings/security/`,
+`app/mfa-challenge/`). Built entirely against Supabase Auth's hosted MFA API
+(`supabase.auth.mfa.*`) — no new tables/migrations, Supabase's own `auth.mfa_factors`
+schema stores everything. Verified via `npm run lint`/`typecheck`/`build`/`test`, but
+**no agent has completed a real QR-enrollment-then-login round trip with an actual
+authenticator app** — please do this manually before trusting it in production:
+
+- [ ] `/settings/security` → "Aktivieren" → scan the QR code with a real authenticator
+  app (Google Authenticator, Authy, 1Password, etc.) → enter the 6-digit code → confirm
+  it shows "2FA ist aktiv".
+- [ ] Sign out, sign back in via the normal magic-link flow → confirm you're redirected
+  to `/mfa-challenge` (not straight into the app) → enter a fresh code from the
+  authenticator app → confirm you land back on the page you were headed to.
+- [ ] Confirm a stale/reused/wrong code on `/mfa-challenge` is rejected with the German
+  error message, and a correct one afterwards still works (not locked out).
+- [ ] On `/settings/security`, "Deaktivieren" → confirm it demands a fresh TOTP code
+  (not just a click) and that entering a wrong code refuses to disable 2FA.
+- [ ] Confirm an account with **no** enrolled factor sees zero change in its login
+  flow (magic link → straight into the app, no `/mfa-challenge` redirect ever).
+- [ ] Try abandoning an enrollment (scan QR, close the tab without confirming) then
+  re-clicking "Aktivieren" — confirm it cleanly starts a fresh enrollment rather than
+  erroring on a leftover unverified factor.
