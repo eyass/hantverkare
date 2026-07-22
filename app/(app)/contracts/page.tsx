@@ -23,11 +23,31 @@ export default async function ContractsPage() {
 
   const { data: contracts, error } = await supabase
     .from("contracts")
-    .select("id, interval, status, next_due_date, source_quote_id, customers(name)")
+    .select("id, interval, status, next_due_date, source_quote_id, customer_id")
     .order("next_due_date", { ascending: true });
 
   if (error) {
     console.error("Failed to load contracts:", error);
+  }
+
+  // Fetched separately (rather than a nested `customers(name)` select) to
+  // sidestep Supabase's generated-type ambiguity for to-one vs to-many joins
+  // -- simple enough at this list's expected scale (one row per customer's
+  // active contract, not a high-cardinality join).
+  const customerIds = [...new Set((contracts ?? []).map((c) => c.customer_id).filter((id): id is string => id !== null))];
+  const customerNameById = new Map<string, string>();
+  if (customerIds.length > 0) {
+    const { data: customers, error: customersError } = await supabase
+      .from("customers")
+      .select("id, name")
+      .in("id", customerIds);
+    if (customersError) {
+      console.error("Failed to load customers for contracts list:", customersError);
+    } else {
+      for (const customer of customers ?? []) {
+        customerNameById.set(customer.id, customer.name);
+      }
+    }
   }
 
   return (
@@ -50,9 +70,9 @@ export default async function ContractsPage() {
             <span>Nächste Fälligkeit</span>
           </div>
           {contracts.map((contract, index) => {
-            const customerName =
-              (contract.customers as unknown as { name: string } | { name: string }[] | null) &&
-              (Array.isArray(contract.customers) ? contract.customers[0]?.name : contract.customers?.name);
+            const customerName = contract.customer_id
+              ? customerNameById.get(contract.customer_id)
+              : undefined;
             return (
               <Link
                 key={contract.id}
