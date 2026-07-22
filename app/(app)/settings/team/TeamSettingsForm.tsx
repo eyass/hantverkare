@@ -20,6 +20,11 @@ export type TeamPermissions = {
   membersCanViewBilling: boolean;
   membersCanEditBusinessSettings: boolean;
   smsNotificationsEnabled: boolean;
+  dunningEnabled: boolean;
+  dunningReminderDays: number;
+  dunningMahnungDays: number;
+  dunningEscalationDays: number;
+  dunningTone: "freundlich" | "neutral" | "streng";
 };
 
 export function TeamSettingsForm({
@@ -52,6 +57,27 @@ export function TeamSettingsForm({
       const result = await updateTeamPermissions(next);
       if (result.error) {
         setPerms(perms); // revert optimistic toggle
+        setPermsError(result.error);
+        return;
+      }
+      setPermsNotice("Gespeichert.");
+      router.refresh();
+    });
+  }
+
+  // Generic committer for the non-checkbox dunning fields (day thresholds,
+  // tone). Mirrors handleTogglePerm's optimistic-update-then-revert-on-error
+  // shape, but takes an already-computed next state rather than toggling a
+  // boolean, since day counts and tone aren't binary.
+  function commitPerms(next: TeamPermissions) {
+    const previous = perms;
+    setPerms(next);
+    setPermsError(null);
+    setPermsNotice(null);
+    startPermsTransition(async () => {
+      const result = await updateTeamPermissions(next);
+      if (result.error) {
+        setPerms(previous);
         setPermsError(result.error);
         return;
       }
@@ -238,6 +264,87 @@ export function TeamSettingsForm({
               onChange={() => handleTogglePerm("smsNotificationsEnabled")}
               className="h-5 w-5"
             />
+          </li>
+        </ul>
+      </section>
+
+      <section className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Mahnwesen</h2>
+        <p className="mt-1 text-sm text-[#64748b]">
+          Überfällige Rechnungen erhalten automatisch eine gestufte Erinnerung:
+          zuerst eine freundliche Zahlungserinnerung, dann eine formelle Mahnung
+          mit Verzugszinsen, zuletzt eine Eskalationsmitteilung. Die Fristen
+          zählen ab dem Fälligkeitsdatum der Rechnung.
+        </p>
+        <ul className="mt-4 flex flex-col divide-y divide-[#e9edf2]">
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">Mahnwesen aktivieren</span>
+            <input
+              type="checkbox"
+              checked={perms.dunningEnabled}
+              disabled={isPermsPending}
+              onChange={() => handleTogglePerm("dunningEnabled")}
+              className="h-5 w-5"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Zahlungserinnerung nach (Tagen)
+            </span>
+            <input
+              type="number"
+              min={0}
+              defaultValue={perms.dunningReminderDays}
+              disabled={isPermsPending || !perms.dunningEnabled}
+              onBlur={(e) =>
+                commitPerms({ ...perms, dunningReminderDays: Number(e.target.value) })
+              }
+              className="w-20 rounded-md border border-[#e9edf2] p-2 text-right text-sm"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">Mahnung nach (Tagen)</span>
+            <input
+              type="number"
+              min={0}
+              defaultValue={perms.dunningMahnungDays}
+              disabled={isPermsPending || !perms.dunningEnabled}
+              onBlur={(e) =>
+                commitPerms({ ...perms, dunningMahnungDays: Number(e.target.value) })
+              }
+              className="w-20 rounded-md border border-[#e9edf2] p-2 text-right text-sm"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">Eskalation nach (Tagen)</span>
+            <input
+              type="number"
+              min={0}
+              defaultValue={perms.dunningEscalationDays}
+              disabled={isPermsPending || !perms.dunningEnabled}
+              onBlur={(e) =>
+                commitPerms({ ...perms, dunningEscalationDays: Number(e.target.value) })
+              }
+              className="w-20 rounded-md border border-[#e9edf2] p-2 text-right text-sm"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">Tonfall</span>
+            <select
+              value={perms.dunningTone}
+              disabled={isPermsPending || !perms.dunningEnabled}
+              onChange={(e) =>
+                commitPerms({
+                  ...perms,
+                  dunningTone: e.target.value as TeamPermissions["dunningTone"],
+                })
+              }
+              className="rounded-md border border-[#e9edf2] p-2 text-sm"
+            >
+              <option value="freundlich">Freundlich</option>
+              <option value="neutral">Neutral</option>
+              <option value="streng">Streng</option>
+            </select>
           </li>
         </ul>
       </section>

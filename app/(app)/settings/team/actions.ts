@@ -80,6 +80,11 @@ export type TeamPermissionsInput = {
   membersCanViewBilling: boolean;
   membersCanEditBusinessSettings: boolean;
   smsNotificationsEnabled: boolean;
+  dunningEnabled: boolean;
+  dunningReminderDays: number;
+  dunningMahnungDays: number;
+  dunningEscalationDays: number;
+  dunningTone: "freundlich" | "neutral" | "streng";
 };
 
 /**
@@ -108,6 +113,21 @@ export async function updateTeamPermissions(
     return { error: "Nur der Inhaber kann die Berechtigungen ändern." };
   }
 
+  // Reminder-day thresholds must stay non-negative and sequential (reminder <
+  // mahnung < escalation) or the dunning cron's stage logic in
+  // lib/invoices/dunning.ts would never fire the later stages. Not enforced
+  // in SQL (see 0020_invoice_dunning.sql's comment), so clamp/validate here.
+  if (
+    input.dunningReminderDays < 0 ||
+    input.dunningMahnungDays <= input.dunningReminderDays ||
+    input.dunningEscalationDays <= input.dunningMahnungDays
+  ) {
+    return {
+      error:
+        "Die Fristen müssen aufsteigend sein: Erinnerung < Mahnung < Eskalation.",
+    };
+  }
+
   const admin = createAdminClient();
   const { error } = await admin
     .from("organizations")
@@ -116,6 +136,11 @@ export async function updateTeamPermissions(
       members_can_view_billing: input.membersCanViewBilling,
       members_can_edit_business_settings: input.membersCanEditBusinessSettings,
       sms_notifications_enabled: input.smsNotificationsEnabled,
+      dunning_enabled: input.dunningEnabled,
+      dunning_reminder_days: input.dunningReminderDays,
+      dunning_mahnung_days: input.dunningMahnungDays,
+      dunning_escalation_days: input.dunningEscalationDays,
+      dunning_tone: input.dunningTone,
     })
     .eq("id", org.organizationId);
 

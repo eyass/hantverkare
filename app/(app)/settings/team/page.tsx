@@ -75,6 +75,11 @@ export default async function TeamSettingsPage() {
           membersCanViewBilling: true,
           membersCanEditBusinessSettings: true,
           smsNotificationsEnabled: false,
+          dunningEnabled: true,
+          dunningReminderDays: 3,
+          dunningMahnungDays: 10,
+          dunningEscalationDays: 24,
+          dunningTone: "neutral",
         }
       }
     />
