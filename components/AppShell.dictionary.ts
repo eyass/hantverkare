@@ -15,6 +15,11 @@ export type AppShellCopy = {
     team: string;
     dangerZone: string;
   };
+  navGroups: {
+    work: string;
+    business: string;
+    admin: string;
+  };
   signOut: string;
 };
 
@@ -32,7 +37,12 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       reports: "Berichte",
       settings: "Einstellungen",
       team: "Team",
-      dangerZone: "Danger Zone",
+      dangerZone: "Gefahrenzone",
+    },
+    navGroups: {
+      work: "Arbeit",
+      business: "Geschäft",
+      admin: "Verwaltung",
     },
     signOut: "Abmelden",
   },
@@ -49,7 +59,12 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       reports: "Reports",
       settings: "Settings",
       team: "Team",
-      dangerZone: "Danger Zone",
+      dangerZone: "Danger zone",
+    },
+    navGroups: {
+      work: "Work",
+      business: "Business",
+      admin: "Admin",
     },
     signOut: "Sign out",
   },
