@@ -3,6 +3,7 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 export type AppShellCopy = {
   nav: {
     quotes: string;
+    schedule: string;
     customers: string;
     priceList: string;
     quoteTemplates: string;
@@ -19,6 +20,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
   de: {
     nav: {
       quotes: "Angebote",
+      schedule: "Termine",
       customers: "Kunden",
       priceList: "Preisliste",
       quoteTemplates: "Vorlagen",
@@ -33,6 +35,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
   en: {
     nav: {
       quotes: "Quotes",
+      schedule: "Schedule",
       customers: "Customers",
       priceList: "Price list",
       quoteTemplates: "Templates",
