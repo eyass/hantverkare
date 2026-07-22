@@ -5,6 +5,7 @@ export type AppShellCopy = {
     quotes: string;
     schedule: string;
     myJobs: string;
+    contracts: string;
     customers: string;
     priceList: string;
     quoteTemplates: string;
@@ -23,6 +24,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       quotes: "Angebote",
       schedule: "Termine",
       myJobs: "Meine Jobs",
+      contracts: "Wartungsverträge",
       customers: "Kunden",
       priceList: "Preisliste",
       quoteTemplates: "Vorlagen",
@@ -39,6 +41,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       quotes: "Quotes",
       schedule: "Schedule",
       myJobs: "My jobs",
+      contracts: "Contracts",
       customers: "Customers",
       priceList: "Price list",
       quoteTemplates: "Templates",
