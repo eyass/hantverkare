@@ -21,6 +21,12 @@ export type AppShellCopy = {
     admin: string;
   };
   signOut: string;
+  fieldMode: {
+    /** Label shown next to the toggle control in both header and sidebar. */
+    label: string;
+    /** aria-label describing what enabling the toggle does. */
+    toggleAriaLabel: string;
+  };
 };
 
 export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
@@ -45,6 +51,10 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       admin: "Verwaltung",
     },
     signOut: "Abmelden",
+    fieldMode: {
+      label: "Baustellenmodus",
+      toggleAriaLabel: "Baustellenmodus umschalten (größere Schaltflächen für Handschuhe)",
+    },
   },
   en: {
     nav: {
@@ -67,5 +77,9 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       admin: "Admin",
     },
     signOut: "Sign out",
+    fieldMode: {
+      label: "Field mode",
+      toggleAriaLabel: "Toggle field mode (larger buttons for gloves)",
+    },
   },
 };
