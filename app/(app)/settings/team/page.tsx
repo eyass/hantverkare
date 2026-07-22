@@ -65,6 +65,9 @@ export default async function TeamSettingsPage() {
           dunningEscalationDays: 24,
           dunningTone: "neutral",
           inventoryDecrementEnabled: false,
+          reviewRequestEnabled: false,
+          reviewRequestDays: 3,
+          reviewPlatformUrl: null,
         }
       }
     />
