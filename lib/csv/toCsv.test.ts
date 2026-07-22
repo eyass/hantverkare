@@ -49,4 +49,29 @@ describe("toCsv", () => {
     );
     expect(result).toBe('Name\r\nAnna\r\nBert\r\n"Clara, Inc."\r\n');
   });
+
+  it("neutralizes formula injection for fields starting with =", () => {
+    const result = toCsv(["Name"], [['=HYPERLINK("http://evil.com")']]);
+    expect(result).toBe('Name\r\n"\'=HYPERLINK(""http://evil.com"")"\r\n');
+  });
+
+  it("prefixes fields starting with + (e.g. phone numbers) but keeps them readable as text", () => {
+    const result = toCsv(["Telefon"], [["+49 30 1234567"]]);
+    expect(result).toBe("Telefon\r\n'+49 30 1234567\r\n");
+  });
+
+  it("neutralizes formula injection for fields starting with -", () => {
+    const result = toCsv(["Name"], [["-2+3"]]);
+    expect(result).toBe("Name\r\n'-2+3\r\n");
+  });
+
+  it("neutralizes formula injection for fields starting with @", () => {
+    const result = toCsv(["Name"], [["@SUM(1+1)"]]);
+    expect(result).toBe("Name\r\n'@SUM(1+1)\r\n");
+  });
+
+  it("does not prefix normal fields not starting with =, +, -, or @", () => {
+    const result = toCsv(["Name"], [["Max Mustermann"]]);
+    expect(result).toBe("Name\r\nMax Mustermann\r\n");
+  });
 });

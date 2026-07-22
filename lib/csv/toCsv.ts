@@ -2,6 +2,13 @@
 // for the simple "headers + rows of strings" shape our export routes produce.
 
 function escapeCsvField(value: string): string {
+  // Neutralize CSV/formula injection: if a field starts with a character
+  // that spreadsheet software (Excel, Google Sheets, LibreOffice) would
+  // interpret as the start of a formula, prefix it with a single quote so
+  // it is rendered as literal text instead of being executed.
+  if (/^[=+\-@]/.test(value)) {
+    value = `'${value}`;
+  }
   if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
     return `"${value.replace(/"/g, '""')}"`;
   }
