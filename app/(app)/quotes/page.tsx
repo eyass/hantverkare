@@ -67,12 +67,28 @@ export default async function QuotesPage({
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">Angebote</h1>
-        <Link
-          href="/quotes/new"
-          className="rounded-full bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)]"
-        >
-          Neues Angebot
-        </Link>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/export/quotes"
+            download
+            className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
+          >
+            Angebote als CSV exportieren
+          </a>
+          <a
+            href="/api/export/invoices"
+            download
+            className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
+          >
+            Rechnungen als CSV exportieren
+          </a>
+          <Link
+            href="/quotes/new"
+            className="rounded-full bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)]"
+          >
+            Neues Angebot
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">

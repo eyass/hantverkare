@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 type NavItem = {
   href: string;
@@ -13,13 +14,18 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/quotes", label: "Angebote" },
   { href: "/customers", label: "Kunden" },
   { href: "/price-list", label: "Preisliste" },
+  { href: "/quote-templates", label: "Vorlagen" },
   { href: "/reports", label: "Berichte" },
   { href: "/settings", label: "Einstellungen" },
 ];
 
-// Only owners manage the team; members never see the link (and the Server
-// Actions behind it enforce owner-only server-side regardless).
-const OWNER_NAV_ITEMS: NavItem[] = [{ href: "/settings/team", label: "Team" }];
+// Only owners manage the team / danger zone; members never see these links
+// (and the Server Actions behind them enforce owner-only server-side
+// regardless).
+const OWNER_NAV_ITEMS: NavItem[] = [
+  { href: "/settings/team", label: "Team" },
+  { href: "/settings/danger-zone", label: "Danger Zone" },
+];
 
 // The active item is the one whose href is the longest prefix of the current
 // path, so e.g. /settings/team highlights "Team" and not also "Einstellungen".
@@ -90,6 +96,9 @@ export function AppShell({
 
       {/* Main content */}
       <div className="flex min-h-screen flex-1 flex-col bg-[#f4f6f8]">
+        <div className="flex items-center border-b border-[#e9edf2] bg-white px-4 py-3 md:px-8">
+          <GlobalSearch />
+        </div>
         <div className="flex-1 pb-16 md:pb-0">{children}</div>
 
         {/* Mobile bottom tabs */}

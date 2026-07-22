@@ -14,6 +14,13 @@ record — nothing in this section is actionable anymore.
 **The only thing still open is Stripe going live** (see that section below) — everything
 else in this file is done.
 
+## New: `0012_quote_templates.sql` needs manual application
+
+PR for issue #48 (quote templates / reusable line-item bundles) adds
+`supabase/migrations/0012_quote_templates.sql`, creating `quote_templates` and
+`quote_template_items` (org-scoped RLS via `is_org_member`). Once that PR is merged,
+run this migration file in the Supabase SQL editor, the same way 0004–0011 were applied.
+
 ## Migrations — all applied (0004 → 0011)
 
 Reference only; these already ran, in order, in the Supabase SQL editor.
@@ -540,3 +547,28 @@ possible (same email rate-limit blocker as above). Please eyeball:
   badge ("Läuft in N Tagen ab" / "Läuft morgen ab" / "Läuft heute ab" /
   "Abgelaufen") next to the status pill; draft and signed quotes show no
   expiry badge.
+
+## Two-factor authentication (2FA) (T3 — auth, issue #54) — manual QA required
+
+Optional TOTP-based 2FA on top of magic-link login (`app/(app)/settings/security/`,
+`app/mfa-challenge/`). Built entirely against Supabase Auth's hosted MFA API
+(`supabase.auth.mfa.*`) — no new tables/migrations, Supabase's own `auth.mfa_factors`
+schema stores everything. Verified via `npm run lint`/`typecheck`/`build`/`test`, but
+**no agent has completed a real QR-enrollment-then-login round trip with an actual
+authenticator app** — please do this manually before trusting it in production:
+
+- [ ] `/settings/security` → "Aktivieren" → scan the QR code with a real authenticator
+  app (Google Authenticator, Authy, 1Password, etc.) → enter the 6-digit code → confirm
+  it shows "2FA ist aktiv".
+- [ ] Sign out, sign back in via the normal magic-link flow → confirm you're redirected
+  to `/mfa-challenge` (not straight into the app) → enter a fresh code from the
+  authenticator app → confirm you land back on the page you were headed to.
+- [ ] Confirm a stale/reused/wrong code on `/mfa-challenge` is rejected with the German
+  error message, and a correct one afterwards still works (not locked out).
+- [ ] On `/settings/security`, "Deaktivieren" → confirm it demands a fresh TOTP code
+  (not just a click) and that entering a wrong code refuses to disable 2FA.
+- [ ] Confirm an account with **no** enrolled factor sees zero change in its login
+  flow (magic link → straight into the app, no `/mfa-challenge` redirect ever).
+- [ ] Try abandoning an enrollment (scan QR, close the tab without confirming) then
+  re-clicking "Aktivieren" — confirm it cleanly starts a fresh enrollment rather than
+  erroring on a leftover unverified factor.
