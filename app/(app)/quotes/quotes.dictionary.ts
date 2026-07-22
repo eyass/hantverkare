@@ -19,6 +19,9 @@ export type QuotesCopy = {
     signed: string;
     declined: string;
   };
+  upcomingJobsTitle: string;
+  upcomingJobsViewAll: string;
+  upcomingJobFallbackLabel: string;
 };
 
 export const QUOTES_DICTIONARY: Dictionary<QuotesCopy> = {
@@ -41,6 +44,9 @@ export const QUOTES_DICTIONARY: Dictionary<QuotesCopy> = {
       signed: "Signiert",
       declined: "Abgelehnt",
     },
+    upcomingJobsTitle: "Anstehende Termine",
+    upcomingJobsViewAll: "Alle Termine ansehen",
+    upcomingJobFallbackLabel: "Auftrag",
   },
   en: {
     title: "Quotes",
@@ -61,5 +67,8 @@ export const QUOTES_DICTIONARY: Dictionary<QuotesCopy> = {
       signed: "Signed",
       declined: "Declined",
     },
+    upcomingJobsTitle: "Upcoming appointments",
+    upcomingJobsViewAll: "View all appointments",
+    upcomingJobFallbackLabel: "Job",
   },
 };
