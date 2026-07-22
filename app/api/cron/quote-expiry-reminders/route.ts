@@ -3,6 +3,10 @@ import { sendExpiryReminderEmail } from "@/lib/notifications/sendExpiryReminderE
 import { sendSmsNotification, buildExpiryReminderSmsBody } from "@/lib/notifications/sendSmsNotification";
 import { daysUntilExpiry, REMINDER_WINDOW_DAYS } from "@/lib/quotes/expiry";
 
+// Excludes declined quotes (declined_at is not null, see 0017_quote_decline.sql)
+// -- once a customer has explicitly declined, they should never keep getting
+// nudged to sign a quote they've already turned down.
+//
 // Vercel Cron (see vercel.json's `crons` entry) hits this route on a schedule
 // with no user session at all, so it must use the service-role admin client
 // (see lib/supabase/admin.ts) to read/write across every organization's
@@ -44,6 +48,7 @@ export async function GET(request: Request): Promise<Response> {
     .select("id, user_id, customer_id, customer_description, expires_at, share_token, organization_id")
     .eq("status", "final")
     .is("expiry_reminder_sent_at", null)
+    .is("declined_at", null)
     .not("expires_at", "is", null)
     .gte("expires_at", now.toISOString())
     .lte("expires_at", windowEnd.toISOString());
