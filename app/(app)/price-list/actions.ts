@@ -10,6 +10,9 @@ export type PriceListItemInput = {
   unit: string;
   unitPriceCents: number;
   category: string;
+  trackStock?: boolean;
+  stockQuantity?: number | null;
+  lowStockThreshold?: number | null;
 };
 
 type PriceListItemRow = {
@@ -18,6 +21,9 @@ type PriceListItemRow = {
   unit: string;
   unit_price_cents: number;
   category: string;
+  track_stock: boolean;
+  stock_quantity: number | null;
+  low_stock_threshold: number | null;
 };
 
 type CreateResult = { error: string; item?: never } | { error: null; item: PriceListItemRow };
@@ -62,8 +68,13 @@ export async function createPriceListItem(input: PriceListItemInput): Promise<Cr
       category: input.category,
       organization_id: org.organizationId,
       user_id: user.id,
+      track_stock: input.trackStock ?? false,
+      stock_quantity: input.stockQuantity ?? null,
+      low_stock_threshold: input.lowStockThreshold ?? null,
     })
-    .select("id, label, unit, unit_price_cents, category")
+    .select(
+      "id, label, unit, unit_price_cents, category, track_stock, stock_quantity, low_stock_threshold",
+    )
     .single();
   if (error || !data) {
     console.error("Failed to create price list item:", error);
@@ -90,6 +101,9 @@ export async function updatePriceListItem(
       unit: input.unit,
       unit_price_cents: input.unitPriceCents,
       category: input.category,
+      track_stock: input.trackStock ?? false,
+      stock_quantity: input.stockQuantity ?? null,
+      low_stock_threshold: input.lowStockThreshold ?? null,
     })
     .eq("id", id);
   if (error) {
@@ -98,6 +112,44 @@ export async function updatePriceListItem(
   }
 
   return { error: null };
+}
+
+export type RestockResult = { error: string; stockQuantity?: never } | { error: null; stockQuantity: number };
+
+/**
+ * Manual restock action (issue #125) -- adds `amount` to an item's current
+ * stock_quantity. Uses the atomic increment_price_list_stock() RPC (see
+ * 0020_materials_inventory.sql) rather than a client read-then-write, so a
+ * restock can never race with a concurrent sign-triggered decrement. No
+ * live supplier integration -- this is purely "I physically restocked X
+ * units, reflect that here" (explicitly out of scope per the issue).
+ */
+export async function restockPriceListItem(id: string, amount: number): Promise<RestockResult> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: "Menge muss größer als 0 sein." };
+  }
+
+  const supabase = await createClient();
+  const { error: rpcError } = await supabase.rpc("increment_price_list_stock", {
+    item_id: id,
+    qty: amount,
+  });
+  if (rpcError) {
+    console.error("Failed to restock price list item:", rpcError);
+    return { error: "Bestand konnte nicht aktualisiert werden." };
+  }
+
+  const { data, error } = await supabase
+    .from("price_list_items")
+    .select("stock_quantity")
+    .eq("id", id)
+    .single();
+  if (error || !data || data.stock_quantity === null) {
+    console.error("Failed to reload stock quantity after restock:", error);
+    return { error: "Bestand konnte nicht neu geladen werden." };
+  }
+
+  return { error: null, stockQuantity: data.stock_quantity };
 }
 
 export async function deletePriceListItem(id: string): Promise<ActionResult> {

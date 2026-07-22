@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSignedNotification } from "@/lib/notifications/sendSignedEmail";
 import { sendDeclinedNotification } from "@/lib/notifications/sendDeclinedEmail";
 import { sendSmsNotification, buildSignedSmsBody } from "@/lib/notifications/sendSmsNotification";
+import { decrementStockOnSign } from "@/lib/inventory/decrementStockOnSign";
 
 type SignQuoteResult = { error: string | null };
 type DeclineQuoteResult = { error: string | null };
@@ -124,6 +125,16 @@ export async function signQuote(token: string, signerName: string): Promise<Sign
     }
   } catch (notifyErr) {
     console.error("Failed to send signed-quote notification:", notifyErr);
+  }
+
+  // Best-effort stock decrement (issue #125), gated on the org's opt-in
+  // toggle -- must never affect the result returned to the already-signed
+  // customer.
+  try {
+    const quote = data[0];
+    await decrementStockOnSign(supabase, quote.organization_id, quote.id);
+  } catch (inventoryErr) {
+    console.error("Failed to decrement stock after signing:", inventoryErr);
   }
 
   return { error: null };
