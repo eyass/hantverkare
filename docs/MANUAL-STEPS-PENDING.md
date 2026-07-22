@@ -3,21 +3,20 @@
 Running list of things only you can do, accumulated while working through the backlog
 autonomously. Nothing here blocks progress — each item is noted and work continues.
 
-## Backlog complete
+## Status: migrations, RESEND_API_KEY, and visual QA all confirmed done ✅
 
-Every tracked backlog item is now merged to `main`: AI quote generation, real auth,
-voice-to-text capture, business settings, customer records, e-signature, quote-customer
-linking, notifications, reporting, PDF export, invoicing, the full design-system restyle,
-Stripe SaaS billing (#19), and multi-user/team accounts (#15, the last item, done last
-on purpose since it changed the ownership model everything else assumed). Nothing is
-left running in the background. **The items below are the only work remaining, and all
-of it requires you** — migrations to run, secrets to add, and QA to eyeball. Once you've
-worked through this list the app is fully live.
+Confirmed by you: all migrations below (0004 → 0011) have been applied in the Supabase
+SQL editor, `RESEND_API_KEY` has been added to Vercel/`.env.local`, and the visual/manual
+QA checklists (original app QA, design-system restyle QA, and price list wizard QA) have
+all been eyeballed. The migration SQL and checklists are kept below as a historical
+record — nothing in this section is actionable anymore.
 
-## Migrations to apply in the Supabase SQL editor
+**The only thing still open is Stripe going live** (see that section below) — everything
+else in this file is done.
 
-Run these **in order** (0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010) — later
-ones reference earlier tables/columns.
+## Migrations — all applied (0004 → 0011)
+
+Reference only; these already ran, in order, in the Supabase SQL editor.
 
 ### `0004_business_settings.sql`
 ```sql
@@ -447,17 +446,14 @@ need to:
 - [ ] Once ready to accept real payments, switch to live-mode keys/Price/webhook
   yourself -- this is an explicit, deliberate step no agent will take.
 
-## Secrets to add (Vercel env vars + `.env.local`)
+## Secrets — added ✅
 
-- [ ] **`RESEND_API_KEY`** — from [resend.com](https://resend.com) (free tier is fine to
-  start). Used by the new "email notification when a quote is signed" feature
-  (`lib/notifications/sendSignedEmail.ts`). Until this is set, signing still works
-  perfectly (the email send is a best-effort side effect that never blocks the
-  customer-facing flow) — you just won't get notified by email yet. Also worth
-  swapping the hardcoded `onboarding@resend.dev` sender in that file for a verified
-  custom domain sender once you have one set up in Resend.
+- [x] **`RESEND_API_KEY`** — added to Vercel/`.env.local`. Used by the "email
+  notification when a quote is signed" feature (`lib/notifications/sendSignedEmail.ts`).
+  Still worth swapping the hardcoded `onboarding@resend.dev` sender in that file for a
+  verified custom domain sender once you have one set up in Resend (not blocking).
 
-## Visual/manual QA spot-check needed
+## Visual/manual QA — done ✅
 
 Supabase's default mailer hit its project-wide rate limit (2 emails/hour) during
 earlier testing, so live browser QA (sign in via magic link → click through the UI)
@@ -465,25 +461,25 @@ couldn't be done for every feature built afterward. Each was still verified via 
 review (spec-compliance + adversarial quality review) and `npm run build`/`npm test`,
 but you should eyeball these once you're back:
 
-- [ ] `/quotes` — list page, status filter tabs, empty state, header nav links
-- [ ] `/settings` — business settings form saves/loads correctly
-- [ ] `/customers` — add/edit/delete a customer, inline save-on-blur works
-- [ ] `/customers/[id]` — shows that customer's quote history
-- [ ] `/quotes/new` — customer picker dropdown works, quote generation still works
+- [x] `/quotes` — list page, status filter tabs, empty state, header nav links
+- [x] `/settings` — business settings form saves/loads correctly
+- [x] `/customers` — add/edit/delete a customer, inline save-on-blur works
+- [x] `/customers/[id]` — shows that customer's quote history
+- [x] `/quotes/new` — customer picker dropdown works, quote generation still works
   end-to-end with a customer selected and with none selected
-- [ ] `/quotes/[id]` (a finalized quote) — shows the public share link
-- [ ] `/q/[token]` (the public link from a finalized quote) — loads without auth, shows
+- [x] `/quotes/[id]` (a finalized quote) — shows the public share link
+- [x] `/q/[token]` (the public link from a finalized quote) — loads without auth, shows
   line items + totals, sign form works, transitions to "signiert" and shows the
   confirmation on reload
-- [ ] Sharing a **draft** quote's link (if you can get one before finalizing) should
+- [x] Sharing a **draft** quote's link (if you can get one before finalizing) should
   show only "noch nicht bereit zur Ansicht", no pricing detail
-- [ ] After signing a quote (once `RESEND_API_KEY` is set): confirm you receive the
+- [x] After signing a quote (once `RESEND_API_KEY` is set): confirm you receive the
   "quote signed" email
-- [ ] On a signed quote: click "Rechnung erstellen", confirm an invoice number appears
+- [x] On a signed quote: click "Rechnung erstellen", confirm an invoice number appears
   (format `RE-2026-0001`) and re-clicking doesn't create a duplicate
-- [ ] `/quotes/[id]/pdf` — download link produces a readable PDF with your business
+- [x] `/quotes/[id]/pdf` — download link produces a readable PDF with your business
   settings (once filled in) in the letterhead
-- [ ] `/reports` — stat tiles show sensible numbers, "–" shown correctly with zero
+- [x] `/reports` — stat tiles show sensible numbers, "–" shown correctly with zero
   quotes/signed quotes
 
 ## Design-system restyle (Phase A + B, merged) — visual QA needed
@@ -493,28 +489,28 @@ card-based layouts, pill status badges, voice-capture "orb"). All logic was veri
 unchanged via code review and `npm test`/`npm run build`, but no live browser pass was
 possible (same email rate-limit blocker as above). Please eyeball:
 
-- [ ] Desktop sidebar + mobile bottom tabs (`components/AppShell.tsx`) — nav highlighting,
+- [x] Desktop sidebar + mobile bottom tabs (`components/AppShell.tsx`) — nav highlighting,
   sign-out, on a real small screen (not just resized browser)
-- [ ] `/quotes` — new stat tiles (Alle/Entwürfe/Final+Signiert) show correct counts
+- [x] `/quotes` — new stat tiles (Alle/Entwürfe/Final+Signiert) show correct counts
   regardless of which status-filter tab is active (fixed a bug where tiles previously
   reflected the *filtered* count instead of the full set)
-- [ ] `/quotes/new` — voice orb pulsing-ring animation while recording, on both
+- [x] `/quotes/new` — voice orb pulsing-ring animation while recording, on both
   desktop and mobile, with an actual microphone
-- [ ] `/quotes/[id]` — two-column layout on desktop, single column on mobile; sticky
+- [x] `/quotes/[id]` — two-column layout on desktop, single column on mobile; sticky
   summary card behavior when scrolling a long line-item list
-- [ ] `/q/[token]` — dark customer-facing page background, white card contrast, on a
+- [x] `/q/[token]` — dark customer-facing page background, white card contrast, on a
   phone screen (this is the page real customers see)
-- [ ] `/settings`, `/customers`, `/customers/[id]`, `/price-list` — card styling,
+- [x] `/settings`, `/customers`, `/customers/[id]`, `/price-list` — card styling,
   delete-button visibility/contrast
 
 ## Price list wizard — visual QA needed
 
-- [ ] Apply migration `0011_price_list_templates.sql` in the Supabase SQL editor
+- [x] Apply migration `0011_price_list_templates.sql` in the Supabase SQL editor
   (after 0010).
-- [ ] `/price-list` with zero items shows the trade-picker wizard, not the empty table.
-- [ ] Picking a trade shows its checklist with all items checked and default prices filled in.
-- [ ] Unchecking an item excludes it from the inserted list.
-- [ ] Editing a price in the review step is reflected in the saved item.
-- [ ] "Zurück" returns to the trade picker without losing template data.
-- [ ] "Leer starten" goes straight to the existing manual editor.
-- [ ] `/price-list` with existing items shows the normal editor, no wizard.
+- [x] `/price-list` with zero items shows the trade-picker wizard, not the empty table.
+- [x] Picking a trade shows its checklist with all items checked and default prices filled in.
+- [x] Unchecking an item excludes it from the inserted list.
+- [x] Editing a price in the review step is reflected in the saved item.
+- [x] "Zurück" returns to the trade picker without losing template data.
+- [x] "Leer starten" goes straight to the existing manual editor.
+- [x] `/price-list` with existing items shows the normal editor, no wizard.
