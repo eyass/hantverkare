@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingShell } from "@/components/MarketingShell";
 import { PageHero } from "@/components/marketing/PageHero";
@@ -20,6 +21,28 @@ const SECTIONS = [
       "Für Einzelunternehmer und kleine Handwerksbetriebe im deutschsprachigen Raum, die weniger Zeit mit Papierkram und mehr Zeit mit ihrem eigentlichen Handwerk verbringen wollen.",
   },
 ];
+
+const TITLE = "Über uns — hantverkare";
+const DESCRIPTION =
+  "hantverkare ist kein Marktplatz, sondern ein Verwaltungswerkzeug für Einzelunternehmer und kleine Handwerksbetriebe: eigene Preisliste, Kunden, Angebote und Rechnungen an einem Ort.";
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/about",
+    siteName: "hantverkare",
+    locale: "de_DE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+};
 
 export default function AboutPage() {
   return (
