@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote, assignQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
+import { ContractSection } from "./ContractSection";
 import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
+import type { ContractInterval } from "@/lib/contracts/interval";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { computeProfitability } from "@/lib/quotes/profitability";
 import { PhotosSection } from "./PhotosSection";
@@ -89,10 +91,18 @@ function centsToEuroString(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+type Contract = {
+  id: string;
+  interval: ContractInterval;
+  status: string;
+  next_due_date: string;
+};
+
 export function QuoteEditor({
   quote,
   lineItems,
   invoice,
+  contract,
   photos,
   warranty,
   scheduledJob,
@@ -101,6 +111,7 @@ export function QuoteEditor({
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
+  contract: Contract | null;
   photos: Photo[];
   warranty: WarrantyRecord | null;
   scheduledJob: ScheduledJob | null;
@@ -397,6 +408,8 @@ export function QuoteEditor({
 
           {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
           {status === "signed" && <WarrantySection warranty={warranty} />}
+
+          {status === "signed" && <ContractSection quoteId={quote.id} contract={contract} />}
 
           {isDraft && <SaveAsTemplateSection quoteId={quote.id} />}
         </div>

@@ -6,6 +6,7 @@ import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
+import { computeNextDueDate, isValidContractInterval, type ContractInterval } from "@/lib/contracts/interval";
 
 type UpdateLineItemInput = {
   description: string;
@@ -371,7 +372,7 @@ export async function deleteQuotePhoto(photoId: string): Promise<{ error: string
  * assigneeUserId is null (issue #128).
  *
  * This is purely a label on top of the existing org-membership RLS on
- * `quotes` (see 0020_job_assignment.sql) -- it does not grant or restrict
+ * `quotes` (see 0023_job_assignment.sql) -- it does not grant or restrict
  * anyone's view/edit access, which stays governed by is_org_member as before.
  * What this action DOES enforce server-side:
  *   1. the caller must belong to an organization (any member, not owner-only
@@ -436,4 +437,91 @@ export async function assignQuote(
   revalidatePath(`/quotes/${quoteId}`);
   revalidatePath("/jobs");
   return { error: null };
+}
+
+type ContractRow = {
+  id: string;
+  interval: ContractInterval;
+  status: string;
+  next_due_date: string;
+};
+
+type ConvertToContractResult =
+  | { error: string; contract?: never }
+  | { error: null; contract: ContractRow };
+
+/**
+ * Converts a signed quote (issue #126) into a recurring `contracts` row: the
+ * contract-renewal cron (app/api/cron/contract-renewal/route.ts) picks up
+ * active contracts whose next_due_date has arrived and generates a fresh
+ * quote by duplicating this one. Only a 'signed' quote can be converted --
+ * mirrors createInvoice's `.eq status "signed"` guard above, since a
+ * maintenance contract only makes sense once the customer has actually
+ * agreed to the original job.
+ *
+ * At most one contract per source quote (checked here, not enforced by a DB
+ * unique constraint -- acceptable since this is a user-initiated action
+ * behind a button, not a race-prone webhook like invoice creation).
+ */
+export async function convertQuoteToContract(
+  quoteId: string,
+  interval: string,
+): Promise<ConvertToContractResult> {
+  if (!isValidContractInterval(interval)) {
+    return { error: "Ungültiges Intervall." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("status, customer_id")
+    .eq("id", quoteId)
+    .single();
+  if (!quote || quote.status !== "signed") {
+    return { error: "Nur signierte Angebote können in einen Wartungsvertrag umgewandelt werden." };
+  }
+
+  const { data: existingContract } = await supabase
+    .from("contracts")
+    .select("id, interval, status, next_due_date")
+    .eq("source_quote_id", quoteId)
+    .maybeSingle();
+  if (existingContract) {
+    return { error: null, contract: existingContract };
+  }
+
+  const nextDueDate = computeNextDueDate(interval);
+
+  const { data: contract, error: insertError } = await supabase
+    .from("contracts")
+    .insert({
+      organization_id: org.organizationId,
+      user_id: user.id,
+      source_quote_id: quoteId,
+      customer_id: quote.customer_id,
+      interval,
+      next_due_date: nextDueDate.toISOString().slice(0, 10),
+    })
+    .select("id, interval, status, next_due_date")
+    .single();
+
+  if (insertError || !contract) {
+    console.error("Failed to create contract:", insertError);
+    return { error: "Wartungsvertrag konnte nicht erstellt werden." };
+  }
+
+  return { error: null, contract };
 }
