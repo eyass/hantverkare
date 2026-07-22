@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { buildRowsToInsert, type Selection } from "@/lib/priceList/templateSelection";
+import { parsePriceListImport, type ParsedPriceListRow, type PriceListRowError } from "@/lib/priceList/importPriceList";
 
 export type PriceListItemInput = {
   label: string;
@@ -158,4 +159,206 @@ export async function createPriceListItemsFromTemplate(
   }
 
   return { error: null };
+}
+
+export type BulkAdjustResult = { error: string | null; updated?: number };
+
+/**
+ * Bulk-adjusts every price-list item's unit price by a percentage (issue
+ * #129, "increase all materials by 5%"). Positive percent increases prices,
+ * negative decreases them. Reads the caller's own items (RLS-scoped to their
+ * org via is_org_member), computes new prices in application code, then
+ * writes them back with an upsert keyed on `id` -- there's no
+ * `unit_price_cents = unit_price_cents * x` update expression available
+ * through the Supabase JS client, so this is the simplest correct way to do
+ * a bulk numeric update without a new SQL function/migration.
+ */
+export async function bulkAdjustPriceListPrices(percent: number): Promise<BulkAdjustResult> {
+  if (!Number.isFinite(percent)) {
+    return { error: "Ungültiger Prozentsatz." };
+  }
+  // A single adjustment can't zero out or invert prices, and anything wilder
+  // than +/-90% is almost certainly a typo (e.g. "500" instead of "5").
+  if (percent <= -90 || percent > 1000) {
+    return { error: "Prozentsatz muss zwischen -90 und 1000 liegen." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: items, error: fetchError } = await supabase
+    .from("price_list_items")
+    .select("id, unit_price_cents")
+    .eq("organization_id", org.organizationId);
+  if (fetchError) {
+    console.error("Failed to load price list items for bulk adjustment:", fetchError);
+    return { error: "Preisliste konnte nicht geladen werden." };
+  }
+  if (!items || items.length === 0) {
+    return { error: null, updated: 0 };
+  }
+
+  const factor = 1 + percent / 100;
+  const updates = items.map((item) => ({
+    id: item.id,
+    unit_price_cents: Math.max(1, Math.round(item.unit_price_cents * factor)),
+  }));
+
+  const { error: updateError } = await supabase
+    .from("price_list_items")
+    .upsert(updates, { onConflict: "id" });
+  if (updateError) {
+    console.error("Failed to bulk-adjust price list items:", updateError);
+    return { error: "Preise konnten nicht angepasst werden." };
+  }
+
+  return { error: null, updated: updates.length };
+}
+
+export type PriceListImportPreviewResult =
+  | { error: string; validRows?: never; errors?: never }
+  | { error: null; validRows: ParsedPriceListRow[]; errors: PriceListRowError[] };
+
+/**
+ * Parses+validates an uploaded CSV file for the price-list bulk-reimport
+ * preview step (issue #129). Purely a parsing/validation pass -- nothing is
+ * written to the database here -- mirrors previewCustomerImport in
+ * app/(app)/customers/actions.ts.
+ */
+export async function previewPriceListImport(csvText: string): Promise<PriceListImportPreviewResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  if (csvText.trim().length === 0) {
+    return { error: "Die Datei ist leer." };
+  }
+
+  const { validRows, errors } = parsePriceListImport(csvText);
+
+  if (validRows.length === 0 && errors.length === 0) {
+    return { error: "Die Datei enthält keine Preislisten-Daten." };
+  }
+
+  return { error: null, validRows, errors };
+}
+
+export type PriceListImportCommitResult =
+  | { error: string; updated?: never; created?: never }
+  | { error: null; updated: number; created: number };
+
+/**
+ * Commits a previously previewed CSV re-import: re-parses the raw CSV text
+ * server-side (never trusts client-supplied row objects, same trust-boundary
+ * pattern as commitCustomerImport) and overwrites pricing in bulk --
+ * matching each valid row to an existing item by its label (case-insensitive)
+ * within the caller's org: a match updates unit/price/category in place, a
+ * non-match inserts a new item. This lets a supplier's updated price sheet
+ * be dropped in wholesale without needing a new unique constraint/migration
+ * to upsert on.
+ */
+export async function commitPriceListImport(csvText: string): Promise<PriceListImportCommitResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { validRows } = parsePriceListImport(csvText);
+  if (validRows.length === 0) {
+    return { error: "Keine gültigen Positionen zum Importieren gefunden." };
+  }
+
+  const { data: existingItems, error: fetchError } = await supabase
+    .from("price_list_items")
+    .select("id, label")
+    .eq("organization_id", org.organizationId);
+  if (fetchError) {
+    console.error("Failed to load existing price list items for import:", fetchError);
+    return { error: "Preisliste konnte nicht geladen werden." };
+  }
+
+  const existingByLabel = new Map<string, string>();
+  (existingItems ?? []).forEach((item) => {
+    existingByLabel.set(item.label.trim().toLowerCase(), item.id);
+  });
+
+  const rowsToUpdate: Array<{
+    id: string;
+    label: string;
+    unit: string;
+    unit_price_cents: number;
+    category: string;
+  }> = [];
+  const rowsToInsert: Array<{
+    label: string;
+    unit: string;
+    unit_price_cents: number;
+    category: string;
+    organization_id: string;
+    user_id: string;
+  }> = [];
+
+  validRows.forEach((row) => {
+    const existingId = existingByLabel.get(row.label.trim().toLowerCase());
+    if (existingId) {
+      rowsToUpdate.push({
+        id: existingId,
+        label: row.label,
+        unit: row.unit,
+        unit_price_cents: row.unitPriceCents,
+        category: row.category,
+      });
+    } else {
+      rowsToInsert.push({
+        label: row.label,
+        unit: row.unit,
+        unit_price_cents: row.unitPriceCents,
+        category: row.category,
+        organization_id: org.organizationId,
+        user_id: user.id,
+      });
+    }
+  });
+
+  if (rowsToUpdate.length > 0) {
+    const { error: updateError } = await supabase
+      .from("price_list_items")
+      .upsert(rowsToUpdate, { onConflict: "id" });
+    if (updateError) {
+      console.error("Failed to bulk-update price list items from import:", updateError);
+      return { error: "Import fehlgeschlagen. Es wurde nichts gespeichert." };
+    }
+  }
+
+  if (rowsToInsert.length > 0) {
+    const { error: insertError } = await supabase.from("price_list_items").insert(rowsToInsert);
+    if (insertError) {
+      console.error("Failed to bulk-insert price list items from import:", insertError);
+      return { error: "Import fehlgeschlagen. Es wurden nur bestehende Positionen aktualisiert." };
+    }
+  }
+
+  return { error: null, updated: rowsToUpdate.length, created: rowsToInsert.length };
 }

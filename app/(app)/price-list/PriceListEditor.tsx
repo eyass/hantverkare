@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   createPriceListItem,
   updatePriceListItem,
   deletePriceListItem,
+  bulkAdjustPriceListPrices,
   type PriceListItemInput,
 } from "./actions";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
@@ -28,11 +31,54 @@ const inputClass =
 export function PriceListEditor({ items: initialItems }: { items: PriceListItem[] }) {
   const { language } = useAppLanguage();
   const t = PRICE_LIST_DICTIONARY[language];
+  const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [lastSavedItems, setLastSavedItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ label: "", unit: "", unitPrice: "", category: "" });
   const [isPending, startTransition] = useTransition();
+  const [adjustPercent, setAdjustPercent] = useState("");
+  const [adjustMessage, setAdjustMessage] = useState<string | null>(null);
+  const [isAdjusting, startAdjustTransition] = useTransition();
+
+  function handleBulkAdjust() {
+    const percent = Number(adjustPercent);
+    if (!Number.isFinite(percent) || percent === 0) {
+      setError("Bitte einen gültigen Prozentsatz ungleich 0 eingeben.");
+      return;
+    }
+    startAdjustTransition(async () => {
+      const result = await bulkAdjustPriceListPrices(percent);
+      if (result.error !== null) {
+        setError(result.error);
+        setAdjustMessage(null);
+        return;
+      }
+      setError(null);
+      setAdjustMessage(
+        `${result.updated ?? 0} ${(result.updated ?? 0) === 1 ? "Preis wurde" : "Preise wurden"} angepasst.`,
+      );
+      setAdjustPercent("");
+      // Mirror the server-side rounding (Math.round, floor of 1 cent) so the
+      // list reflects the change immediately without a full page refetch --
+      // router.refresh() alone wouldn't re-init this component's local
+      // `items` state since it's seeded once from the initial server props.
+      const factor = 1 + percent / 100;
+      setItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          unit_price_cents: Math.max(1, Math.round(item.unit_price_cents * factor)),
+        })),
+      );
+      setLastSavedItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          unit_price_cents: Math.max(1, Math.round(item.unit_price_cents * factor)),
+        })),
+      );
+      router.refresh();
+    });
+  }
 
   function handleAdd() {
     const input: PriceListItemInput = {
@@ -105,8 +151,38 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
+        <Link
+          href="/price-list/import"
+          className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+        >
+          {t.importCsv}
+        </Link>
+      </div>
       {error && <p className="text-sm text-[#dc2626]">{error}</p>}
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">{t.bulkAdjustTitle}</h2>
+        <p className="text-sm text-[#64748b]">{t.bulkAdjustDescription}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="number"
+            value={adjustPercent}
+            onChange={(e) => setAdjustPercent(e.target.value)}
+            placeholder={t.bulkAdjustPlaceholder}
+            className="w-40 rounded-xl border border-[#e9edf2] p-2.5 font-mono text-sm text-[#0f172a] outline-none focus:border-[#2563eb]"
+          />
+          <span className="text-sm text-[#64748b]">%</span>
+          <button
+            onClick={handleBulkAdjust}
+            disabled={isAdjusting || items.length === 0}
+            className="rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
+          >
+            {t.bulkAdjustApply}
+          </button>
+        </div>
+        {adjustMessage && <p className="text-sm text-[#16a34a]">{adjustMessage}</p>}
+      </div>
       <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
