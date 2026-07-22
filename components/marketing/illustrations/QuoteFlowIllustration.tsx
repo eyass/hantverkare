@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef } from "react";
 
 /**
  * Original abstract SVG illustration of the quote-generation flow: a
@@ -11,6 +12,34 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
   const shouldReduceMotion = useReducedMotion();
 
   const lines = [0, 1, 2, 3];
+
+  const lineRefs = useRef<(SVGGElement | null)[]>([]);
+  const barRef = useRef<SVGRectElement>(null);
+
+  // Same bug class as AnimatedSection/PageHero/QuoteDemo: the line items and
+  // total bar below play a one-shot `initial`/`animate` tween (opacity 0->1,
+  // scaleX 0->1). If that tween ever fails to complete under throttled or
+  // backgrounded conditions, this decorative illustration is left with
+  // permanently invisible/collapsed content instead of settling into its
+  // final fully-drawn state. Force the final visible values unconditionally
+  // after the tweens should have long finished.
+  useEffect(() => {
+    if (shouldReduceMotion) return;
+    const fallbackTimeout = window.setTimeout(() => {
+      // Forcing these final values is safe even if the tween already
+      // completed successfully — it's the same end state either way.
+      lineRefs.current.forEach((node) => {
+        if (!node) return;
+        node.style.opacity = "1";
+        node.style.transform = "none";
+      });
+      const bar = barRef.current;
+      if (bar) {
+        bar.style.transform = "scaleX(1)";
+      }
+    }, 3200);
+    return () => window.clearTimeout(fallbackTimeout);
+  }, [shouldReduceMotion]);
 
   return (
     <svg
@@ -49,6 +78,9 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
         {lines.map((line, index) => (
           <motion.g
             key={line}
+            ref={(node) => {
+              lineRefs.current[index] = node;
+            }}
             initial={{ opacity: shouldReduceMotion ? 1 : 0, x: shouldReduceMotion ? 0 : -12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{
@@ -79,6 +111,7 @@ export function QuoteFlowIllustration({ className = "" }: { className?: string }
 
         {/* Total bar */}
         <motion.rect
+          ref={barRef}
           x="68"
           y="266"
           width="228"

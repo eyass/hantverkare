@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { generateDemoQuote, formatCents, DEMO_JOB_TEMPLATES, type DemoQuote } from "@/lib/demo/mockQuote";
@@ -16,6 +16,26 @@ export function QuoteDemo() {
   const [quote, setQuote] = useState<DemoQuote | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const shouldReduceMotion = useReducedMotion();
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  // Same class of bug fixed in AnimatedSection/PageHero: a framer-motion
+  // mount tween (`initial`/`animate`) can freeze mid-flight under
+  // throttled/backgrounded conditions, leaving this panel stuck at
+  // opacity:0 even though `quote` is set and it should be visible.
+  // Unconditional fallback forces the final visible state regardless.
+  useEffect(() => {
+    if (!quote) return;
+    const fallbackTimeout = window.setTimeout(() => {
+      const node = resultRef.current;
+      if (!node) return;
+      const opacity = Number(window.getComputedStyle(node).opacity);
+      if (Number.isNaN(opacity) || opacity < 0.98) {
+        node.style.opacity = "1";
+        node.style.transform = "none";
+      }
+    }, 900);
+    return () => window.clearTimeout(fallbackTimeout);
+  }, [quote]);
 
   function handleGenerate(text?: string) {
     const input = (text ?? description).trim();
@@ -77,6 +97,7 @@ export function QuoteDemo() {
       <AnimatePresence>
       {quote && (
         <motion.div
+          ref={resultRef}
           initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}

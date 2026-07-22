@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
 import { LogoMark } from "@/components/marketing/illustrations/LogoMark";
+import { AnimatedSection } from "@/components/marketing/AnimatedSection";
 
 const NAV_LINKS = [
   { href: "/", label: "Start" },
@@ -54,18 +54,10 @@ export function MarketingHeader() {
 }
 
 export function MarketingFooter() {
-  const shouldReduceMotion = useReducedMotion();
-
   return (
     <footer className="border-t border-white/10 bg-[#020617]">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-14 sm:flex-row sm:items-start sm:justify-between sm:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col gap-3"
-        >
+        <AnimatedSection className="flex flex-col gap-3">
           <span className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
             <LogoMark />
             hantverkare
@@ -74,7 +66,7 @@ export function MarketingFooter() {
             KI-gestützte Angebote für Handwerker — Auftrag beschreiben, Angebot in unter einer
             Minute, Kunde unterschreibt digital.
           </p>
-        </motion.div>
+        </AnimatedSection>
         <div className="flex gap-12 text-sm text-slate-400">
           <div className="flex flex-col gap-2">
             <span className="font-medium text-white">Produkt</span>
