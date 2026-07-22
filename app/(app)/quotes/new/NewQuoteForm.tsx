@@ -6,7 +6,7 @@ import { VoiceRecorder } from "./VoiceRecorder";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
 import { clearDraft, loadDraft, saveDraft, type QuoteDraft } from "@/lib/quotes/draftStorage";
 import { MAX_AUTO_RETRY_ATTEMPTS, shouldAutoRetry } from "@/lib/quotes/generationQueue";
-import { isOfflineNetworkError } from "@/lib/quotes/offlineNetworkError";
+import { isNextRedirectError } from "@/lib/quotes/offlineNetworkError";
 import {
   clearQueuedGenerationStore,
   enqueueGeneration,
@@ -16,13 +16,22 @@ import {
 const initialState: GenerateQuoteState = { error: null, queuedOffline: false };
 
 /**
- * Wraps the real generateQuoteDraft server action so a failure caused by
- * the device being offline (or losing connectivity mid-request) is
- * distinguished from a genuine server/AI error. Offline failures are
- * reported back as `queuedOffline: true` instead of `error`, so the caller
- * can queue the request and retry automatically once back online. Genuine
- * errors (bad price list, AI generation failure, auth, etc.) pass through
- * untouched and surface immediately, same as before this change.
+ * Wraps the real generateQuoteDraft server action so a submission made
+ * while the device is already offline (detected *before* the action is
+ * ever invoked) is queued for automatic retry instead of failing. This is
+ * the only case that's safe to auto-queue: the request never reached the
+ * server, so there is no risk of a duplicate quote.
+ *
+ * Deliberately NOT auto-queued: a network error thrown *during* or *after*
+ * an actual invocation of `generateQuoteDraft`. That action performs its DB
+ * inserts and only then calls `redirect()` -- if the connection drops after
+ * the insert has committed but before the client receives the response,
+ * the client sees what looks like a network error, but the server may well
+ * have already created the quote. Silently queuing that for auto-retry
+ * risks creating a second, duplicate quote with no user awareness. So once
+ * the action has actually been called, any failure (network-shaped or not)
+ * surfaces as a normal, visible error via `state.error` -- the user decides
+ * consciously whether to retry, same as any other failed submission.
  */
 async function submitOrQueue(
   prevState: GenerateQuoteState,
@@ -36,10 +45,14 @@ async function submitOrQueue(
     const result = await generateQuoteDraft(prevState, formData);
     return { ...result, queuedOffline: false };
   } catch (err) {
-    if (isOfflineNetworkError(err, isOnline)) {
-      return { error: null, queuedOffline: true };
+    if (isNextRedirectError(err)) {
+      throw err;
     }
-    throw err;
+    return {
+      error:
+        "Das Angebot konnte nicht gesendet werden -- möglicherweise wurde es bereits erstellt, möglicherweise nicht. Bitte prüfe deine Angebotsliste und sende es bei Bedarf manuell erneut ab.",
+      queuedOffline: false,
+    };
   }
 }
 
