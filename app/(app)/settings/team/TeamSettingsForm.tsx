@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { inviteMember, removeMember } from "./actions";
+import { inviteMember, removeMember, updateTeamPermissions } from "./actions";
 
 export type TeamMember = {
   userId: string;
@@ -15,20 +15,49 @@ export type PendingInvite = {
   email: string;
 };
 
+export type TeamPermissions = {
+  membersCanDeleteCustomers: boolean;
+  membersCanViewBilling: boolean;
+  membersCanEditBusinessSettings: boolean;
+};
+
 export function TeamSettingsForm({
   members,
   pendingInvites,
   currentUserId,
+  permissions,
 }: {
   members: TeamMember[];
   pendingInvites: PendingInvite[];
   currentUserId: string;
+  permissions: TeamPermissions;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [perms, setPerms] = useState(permissions);
+  const [permsError, setPermsError] = useState<string | null>(null);
+  const [permsNotice, setPermsNotice] = useState<string | null>(null);
+  const [isPermsPending, startPermsTransition] = useTransition();
+
+  function handleTogglePerm(key: keyof TeamPermissions) {
+    const next = { ...perms, [key]: !perms[key] };
+    setPerms(next);
+    setPermsError(null);
+    setPermsNotice(null);
+    startPermsTransition(async () => {
+      const result = await updateTeamPermissions(next);
+      if (result.error) {
+        setPerms(perms); // revert optimistic toggle
+        setPermsError(result.error);
+        return;
+      }
+      setPermsNotice("Gespeichert.");
+      router.refresh();
+    });
+  }
 
   function handleInvite(formData: FormData) {
     const value = String(formData.get("email") ?? "");
@@ -130,6 +159,62 @@ export function TeamSettingsForm({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Mitgliederrechte</h2>
+        <p className="mt-1 text-sm text-[#64748b]">
+          Als Inhaber kannst du festlegen, was Mitglieder tun dürfen. Diese
+          Einschränkungen gelten nicht für dich.
+        </p>
+        <ul className="mt-4 flex flex-col divide-y divide-[#e9edf2]">
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Mitglieder dürfen Kunden löschen
+            </span>
+            <input
+              type="checkbox"
+              checked={perms.membersCanDeleteCustomers}
+              disabled={isPermsPending}
+              onChange={() => handleTogglePerm("membersCanDeleteCustomers")}
+              className="h-5 w-5"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Mitglieder dürfen Rechnungen einsehen
+            </span>
+            <input
+              type="checkbox"
+              checked={perms.membersCanViewBilling}
+              disabled={isPermsPending}
+              onChange={() => handleTogglePerm("membersCanViewBilling")}
+              className="h-5 w-5"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Mitglieder dürfen Unternehmenseinstellungen ändern
+            </span>
+            <input
+              type="checkbox"
+              checked={perms.membersCanEditBusinessSettings}
+              disabled={isPermsPending}
+              onChange={() => handleTogglePerm("membersCanEditBusinessSettings")}
+              className="h-5 w-5"
+            />
+          </li>
+        </ul>
+        {permsError && (
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {permsError}
+          </p>
+        )}
+        {permsNotice && (
+          <p role="status" className="mt-3 text-sm text-[#16a34a]">
+            {permsNotice}
+          </p>
+        )}
       </section>
 
       {pendingInvites.length > 0 && (

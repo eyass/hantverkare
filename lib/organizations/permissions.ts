@@ -20,3 +20,43 @@ export function canManageTeam(role: OrgRole | null | undefined): boolean {
 export function canViewBilling(role: OrgRole | null | undefined): boolean {
   return role === "owner";
 }
+
+/**
+ * Issue #52: owners can restrict members from deleting customers, viewing
+ * invoices, and editing business settings. Each of these is now gated by an
+ * org-level boolean setting (see organizations.members_can_* columns from
+ * 0014_team_permissions.sql), in addition to role.
+ *
+ * Owners can always perform these actions regardless of the org setting --
+ * an owner can never lock themselves out. Members are allowed only when the
+ * org setting explicitly permits it. Fails closed: any unrecognized/undefined
+ * role, or a missing/non-true setting value, is treated as NOT allowed.
+ */
+export function canDeleteCustomers(
+  role: OrgRole | null | undefined,
+  membersCanDeleteCustomers: boolean,
+): boolean {
+  if (role === "owner") return true;
+  return role === "member" && membersCanDeleteCustomers === true;
+}
+
+/**
+ * Governs viewing of the organization's invoices (customer-facing invoice
+ * documents) -- NOT the Stripe subscription/billing row, which stays
+ * hardcoded owner-only via canViewBilling above regardless of this setting.
+ */
+export function canViewInvoices(
+  role: OrgRole | null | undefined,
+  membersCanViewInvoices: boolean,
+): boolean {
+  if (role === "owner") return true;
+  return role === "member" && membersCanViewInvoices === true;
+}
+
+export function canEditBusinessSettings(
+  role: OrgRole | null | undefined,
+  membersCanEditBusinessSettings: boolean,
+): boolean {
+  if (role === "owner") return true;
+  return role === "member" && membersCanEditBusinessSettings === true;
+}

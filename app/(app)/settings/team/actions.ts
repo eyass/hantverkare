@@ -75,6 +75,57 @@ export async function inviteMember(email: string): Promise<ActionResult> {
   return { error: null };
 }
 
+export type TeamPermissionsInput = {
+  membersCanDeleteCustomers: boolean;
+  membersCanViewBilling: boolean;
+  membersCanEditBusinessSettings: boolean;
+};
+
+/**
+ * Updates the owner-configurable member-restriction toggles (issue #52).
+ * Owner-only, enforced server-side the same way as inviteMember/removeMember.
+ * Uses the caller's own RLS-scoped client (not the admin client) as a second
+ * layer of defense: the `organizations` table has no client UPDATE policy at
+ * all, so even if the canManageTeam check below were somehow bypassed, this
+ * update would still be rejected by RLS. We use the admin client instead so
+ * the write actually succeeds, since intentionally there is no owner-write
+ * policy on organizations (writes have been service-role-only since 0010).
+ */
+export async function updateTeamPermissions(
+  input: TeamPermissionsInput,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org || !canManageTeam(org.role)) {
+    return { error: "Nur der Inhaber kann die Berechtigungen ändern." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      members_can_delete_customers: input.membersCanDeleteCustomers,
+      members_can_view_billing: input.membersCanViewBilling,
+      members_can_edit_business_settings: input.membersCanEditBusinessSettings,
+    })
+    .eq("id", org.organizationId);
+
+  if (error) {
+    console.error("Failed to update team permissions:", error);
+    return { error: "Berechtigungen konnten nicht gespeichert werden." };
+  }
+
+  revalidatePath("/settings/team");
+  return { error: null };
+}
+
 /**
  * Removes a member from the organization. Owner-only. Owners cannot be removed
  * through this path (removing/transferring ownership is out of scope for v1),

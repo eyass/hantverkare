@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { getOrgSettings } from "@/lib/organizations/getOrgSettings";
+import { canDeleteCustomers } from "@/lib/organizations/permissions";
 
 export type CustomerInput = {
   name: string;
@@ -97,6 +99,20 @@ export async function updateCustomer(id: string, input: CustomerInput): Promise<
 
 export async function deleteCustomer(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+
+  // Owners can always restrict members from deleting customers (issue #52).
+  // Checked server-side here in addition to the RLS policy so the caller gets
+  // a clear German error instead of a raw DB error if RLS silently no-ops the
+  // delete. This is NOT the security backstop -- RLS is -- it's UX.
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+  const settings = await getOrgSettings(supabase, org.organizationId);
+  if (!settings || !canDeleteCustomers(org.role, settings.membersCanDeleteCustomers)) {
+    return { error: "Nur der Inhaber kann Kunden löschen." };
+  }
+
   const { error } = await supabase.from("customers").delete().eq("id", id);
   if (error) {
     console.error("Failed to delete customer:", error);

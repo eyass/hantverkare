@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { getOrgSettings } from "@/lib/organizations/getOrgSettings";
 import { canManageTeam } from "@/lib/organizations/permissions";
 import { TeamSettingsForm, type TeamMember, type PendingInvite } from "./TeamSettingsForm";
 
@@ -58,11 +59,23 @@ export default async function TeamSettingsPage() {
     email: row.email,
   }));
 
+  // Settings are read via the admin client here too -- the owner-gate above
+  // already confirmed this caller is an owner, and using admin keeps this
+  // page's data-loading consistent with the members/invites reads above.
+  const settings = await getOrgSettings(admin, org.organizationId);
+
   return (
     <TeamSettingsForm
       members={members}
       pendingInvites={pendingInvites}
       currentUserId={user.id}
+      permissions={
+        settings ?? {
+          membersCanDeleteCustomers: true,
+          membersCanViewBilling: true,
+          membersCanEditBusinessSettings: true,
+        }
+      }
     />
   );
 }

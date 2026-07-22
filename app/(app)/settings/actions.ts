@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { getOrgSettings } from "@/lib/organizations/getOrgSettings";
+import { canEditBusinessSettings } from "@/lib/organizations/permissions";
 
 export type BusinessSettingsInput = {
   companyName: string;
@@ -38,6 +40,16 @@ export async function saveBusinessSettings(
   const org = await getCurrentOrg(supabase);
   if (!org) {
     return { error: "Keine Organisation gefunden." };
+  }
+
+  // Owners can always restrict members from editing business settings (issue
+  // #52). Checked server-side in addition to RLS for a clear German error.
+  const settings = await getOrgSettings(supabase, org.organizationId);
+  if (
+    !settings ||
+    !canEditBusinessSettings(org.role, settings.membersCanEditBusinessSettings)
+  ) {
+    return { error: "Nur der Inhaber kann die Unternehmenseinstellungen bearbeiten." };
   }
 
   // business_settings is now one row per organization (PK organization_id).
