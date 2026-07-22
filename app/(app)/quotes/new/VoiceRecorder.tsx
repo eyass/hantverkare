@@ -5,7 +5,18 @@ import { transcribeAudio } from "./actions";
 
 const MAX_RECORDING_SECONDS = 120;
 
-export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) => void }) {
+export type RecordedNote = {
+  text: string;
+  audioUrl: string;
+};
+
+export function VoiceRecorder({
+  onNoteRecorded,
+  hasNotes = false,
+}: {
+  onNoteRecorded: (note: RecordedNote) => void;
+  hasNotes?: boolean;
+}) {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +77,8 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
       setError(result.error);
       return;
     }
-    onTranscript(result.text);
+    const audioUrl = URL.createObjectURL(blob);
+    onNoteRecorded({ text: result.text, audioUrl });
   }
 
   async function startRecording() {
@@ -201,7 +213,9 @@ export function VoiceRecorder({ onTranscript }: { onTranscript: (text: string) =
           <span className="text-sm text-[#94a3b8]">Wird transkribiert…</span>
         )}
         {!isRecording && !isTranscribing && (
-          <span className="text-sm text-[#94a3b8]">Tippen zum Aufnehmen</span>
+          <span className="text-sm text-[#94a3b8]">
+            {hasNotes ? "Weitere Notiz aufnehmen" : "Tippen zum Aufnehmen"}
+          </span>
         )}
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
