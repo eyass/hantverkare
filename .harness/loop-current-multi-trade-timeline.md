@@ -14,12 +14,13 @@
 
 ## ② BUILD
 - [x] Feature branch created
-- [ ] Implemented in atomic commits
-- [ ] Pushed; CI green
+- [x] Implemented in atomic commits
+- [x] Pushed
 
 ## ③ VERIFY
-- [ ] npm run lint / typecheck / build / test
-- [ ] Manual verification via production build
+- [x] npm run lint / typecheck / build / test (all pass, 277 tests)
+- [x] Manual verification via production build
 
 ## ④ SHIP
-- [ ] PR opened, Closes #161
+- [x] PR opened: https://github.com/eyass/hantverkare/pull/172, Closes #161
+- [ ] Merge left to human (not to be done by the agent)
