@@ -4,13 +4,16 @@ import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSignedNotification } from "@/lib/notifications/sendSignedEmail";
 import { sendDeclinedNotification } from "@/lib/notifications/sendDeclinedEmail";
+import { sendQuoteCommentNotification } from "@/lib/notifications/sendQuoteCommentEmail";
 import { sendSmsNotification, buildSignedSmsBody } from "@/lib/notifications/sendSmsNotification";
 import { decrementStockOnSign } from "@/lib/inventory/decrementStockOnSign";
 
 type SignQuoteResult = { error: string | null };
 type DeclineQuoteResult = { error: string | null };
+type AddCommentResult = { error: string | null };
 
 const MAX_DECLINE_REASON_LENGTH = 500;
+const MAX_COMMENT_LENGTH = 2000;
 
 export async function signQuote(token: string, signerName: string): Promise<SignQuoteResult> {
   const trimmedName = signerName.trim();
@@ -187,6 +190,69 @@ export async function declineQuote(token: string, reason: string): Promise<Decli
     }
   } catch (notifyErr) {
     console.error("Failed to send declined-quote notification:", notifyErr);
+  }
+
+  return { error: null };
+}
+
+// Customer-side half of the #155 comment thread. Mirrors declineQuote's
+// security model: the share_token (never a client-supplied quote id) is the
+// only lookup key, via the service-role admin client (customers have no
+// auth session at all -- see 0029_quote_comments.sql's RLS notes). Allowed
+// on any non-draft quote (final, signed, or declined) so a customer can
+// still ask a follow-up question after signing/declining; drafts aren't
+// shared with customers yet (see page.tsx's own draft guard) so they're
+// excluded here too.
+export async function addCustomerComment(token: string, body: string): Promise<AddCommentResult> {
+  const trimmedBody = body.trim().slice(0, MAX_COMMENT_LENGTH);
+  if (trimmedBody.length === 0) {
+    return { error: "Bitte geben Sie eine Nachricht ein." };
+  }
+
+  const supabase = createAdminClient();
+
+  const { data: quote, error: quoteError } = await supabase
+    .from("quotes")
+    .select("id, organization_id, user_id, customer_description, status")
+    .eq("share_token", token)
+    .neq("status", "draft")
+    .maybeSingle();
+  if (quoteError || !quote) {
+    console.error("Failed to look up quote for comment:", quoteError);
+    return { error: "Angebot konnte nicht gefunden werden." };
+  }
+
+  const { error: insertError } = await supabase.from("quote_comments").insert({
+    organization_id: quote.organization_id,
+    quote_id: quote.id,
+    author_type: "customer",
+    author_name: "Kunde",
+    body: trimmedBody,
+  });
+  if (insertError) {
+    console.error("Failed to insert quote comment:", insertError);
+    return { error: "Nachricht konnte nicht gespeichert werden." };
+  }
+
+  // Best-effort notification only -- must never affect the result returned to the
+  // customer, who has already successfully posted at this point.
+  try {
+    const { data: ownerData, error: ownerError } = await supabase.auth.admin.getUserById(
+      quote.user_id,
+    );
+    const ownerEmail = ownerData?.user?.email;
+    if (ownerError || !ownerEmail) {
+      console.error("Failed to look up quote owner for comment notification:", ownerError);
+    } else {
+      await sendQuoteCommentNotification({
+        toEmail: ownerEmail,
+        quoteDescription: quote.customer_description ?? "",
+        quoteId: quote.id,
+        commentBody: trimmedBody,
+      });
+    }
+  } catch (notifyErr) {
+    console.error("Failed to send quote-comment notification:", notifyErr);
   }
 
   return { error: null };

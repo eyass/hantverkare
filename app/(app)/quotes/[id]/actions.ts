@@ -780,3 +780,73 @@ export async function addSuggestedLineItem(
   revalidatePath(`/quotes/${quoteId}`);
   return { error: null, lineItems: allItems, totals };
 }
+
+const MAX_COMMENT_LENGTH = 2000;
+
+export type QuoteCommentRow = {
+  id: string;
+  author_type: "customer" | "member";
+  author_name: string;
+  body: string;
+  created_at: string;
+};
+
+// Tradesperson-side half of the #155 comment thread. Regular org-scoped
+// client (not the admin client) -- reads/writes are covered entirely by
+// quote_comments' is_org_member RLS policies (0029_quote_comments.sql), same
+// as the rest of this file. author_name is the member's own email, since
+// there's no display-name field on organization_members to draw from
+// (getOrgMembers.ts uses the same fallback for the assign-to selector).
+export async function addMemberComment(
+  quoteId: string,
+  body: string,
+): Promise<{ error: string | null; comment?: QuoteCommentRow }> {
+  const trimmedBody = body.trim().slice(0, MAX_COMMENT_LENGTH);
+  if (trimmedBody.length === 0) {
+    return { error: "Bitte geben Sie eine Nachricht ein." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+
+  const { data: comment, error: insertError } = await supabase
+    .from("quote_comments")
+    .insert({
+      organization_id: org.organizationId,
+      quote_id: quoteId,
+      author_type: "member",
+      author_name: user.email ?? "Team",
+      member_id: user.id,
+      body: trimmedBody,
+    })
+    .select("id, author_type, author_name, body, created_at")
+    .single();
+  if (insertError || !comment) {
+    console.error("Failed to insert member comment:", insertError);
+    return { error: "Nachricht konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+
+  return { error: null, comment };
+}
