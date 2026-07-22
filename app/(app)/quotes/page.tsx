@@ -4,6 +4,8 @@ import { formatExpiryBadge } from "@/lib/quotes/expiry";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { getOnboardingChecklistState } from "@/lib/organizations/getOnboardingChecklist";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
+import { QUOTES_DICTIONARY } from "./quotes.dictionary";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -12,13 +14,6 @@ function formatEuros(cents: number): string {
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("de-DE");
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Entwurf",
-  final: "Final",
-  signed: "Signiert",
-  declined: "Abgelehnt",
-};
 
 export default async function QuotesPage({
   searchParams,
@@ -56,6 +51,9 @@ export default async function QuotesPage({
   ).length;
 
   const checklistState = await getOnboardingChecklistState(supabase);
+  const language = await getUserLanguage(supabase);
+  const t = QUOTES_DICTIONARY[language];
+  const STATUS_LABELS = t.status;
 
   const statusBadgeClasses: Record<string, string> = {
     draft: "bg-zinc-100 text-zinc-600",
@@ -73,27 +71,27 @@ export default async function QuotesPage({
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-[#0f172a]">Angebote</h1>
+        <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
         <div className="flex items-center gap-2">
           <a
             href="/api/export/quotes"
             download
             className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
           >
-            Angebote als CSV exportieren
+            {t.exportQuotesCsv}
           </a>
           <a
             href="/api/export/invoices"
             download
             className="rounded-full border border-[#e9edf2] bg-white px-4 py-3 text-sm font-medium text-[#0f172a] transition-colors hover:bg-[#f4f6f8]"
           >
-            Rechnungen als CSV exportieren
+            {t.exportInvoicesCsv}
           </a>
           <Link
             href="/quotes/new"
             className="rounded-full bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)]"
           >
-            Neues Angebot
+            {t.newQuote}
           </Link>
         </div>
       </div>
@@ -103,15 +101,15 @@ export default async function QuotesPage({
       <div className="grid grid-cols-3 gap-3">
         <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
           <span className="font-mono text-2xl font-bold text-[#0f172a]">{totalCount}</span>
-          <span className="text-sm text-[#64748b]">Alle Angebote</span>
+          <span className="text-sm text-[#64748b]">{t.statAll}</span>
         </div>
         <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
           <span className="font-mono text-2xl font-bold text-[#0f172a]">{draftCount}</span>
-          <span className="text-sm text-[#64748b]">Entwürfe</span>
+          <span className="text-sm text-[#64748b]">{t.statDrafts}</span>
         </div>
         <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
           <span className="font-mono text-2xl font-bold text-[#0f172a]">{finalSignedCount}</span>
-          <span className="text-sm text-[#64748b]">Final/Signiert</span>
+          <span className="text-sm text-[#64748b]">{t.statFinalSigned}</span>
         </div>
       </div>
 
@@ -124,7 +122,7 @@ export default async function QuotesPage({
               : "rounded-full px-4 py-1.5 text-[#64748b]"
           }
         >
-          Alle
+          {t.filterAll}
         </Link>
         <Link
           href="/quotes?status=draft"
@@ -134,7 +132,7 @@ export default async function QuotesPage({
               : "rounded-full px-4 py-1.5 text-[#64748b]"
           }
         >
-          Entwürfe
+          {t.filterDrafts}
         </Link>
         <Link
           href="/quotes?status=final"
@@ -144,15 +142,15 @@ export default async function QuotesPage({
               : "rounded-full px-4 py-1.5 text-[#64748b]"
           }
         >
-          Final
+          {t.filterFinal}
         </Link>
       </div>
 
       {!quotes || quotes.length === 0 ? (
         <p className="text-sm text-[#64748b]">
-          Noch keine Angebote vorhanden.{" "}
+          {t.emptyState}{" "}
           <Link href="/quotes/new" className="text-[#2563eb] underline">
-            Jetzt erstellen
+            {t.emptyStateCta}
           </Link>
           .
         </p>

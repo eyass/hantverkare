@@ -6,6 +6,8 @@ import { AppShell } from "@/components/AppShell";
 import { ensureTrialStarted } from "@/lib/billing/ensureTrial";
 import { shouldGateAccess } from "@/lib/billing/gating";
 import { ensureOrganization } from "@/lib/organizations/ensureOrganization";
+import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
+import { AppLanguageProvider } from "@/lib/i18n/AppLanguageProvider";
 
 export default async function AuthenticatedLayout({
   children,
@@ -93,9 +95,18 @@ export default async function AuthenticatedLayout({
     redirect("/billing");
   }
 
+  // Issue #116: resolve the signed-in user's UI language preference here
+  // (server-side, alongside the auth/AAL/billing checks above) and seed the
+  // client AppLanguageProvider with it -- avoids a flash-of-wrong-language
+  // that a client-only localStorage approach (like the marketing site's)
+  // would have on first paint for a signed-in user.
+  const initialLanguage = await getUserLanguage(supabase);
+
   return (
-    <AppShell email={user.email ?? ""} role={org.role} signOutAction={signOut}>
-      {children}
-    </AppShell>
+    <AppLanguageProvider initialLanguage={initialLanguage}>
+      <AppShell email={user.email ?? ""} role={org.role} signOutAction={signOut}>
+        {children}
+      </AppShell>
+    </AppLanguageProvider>
   );
 }
