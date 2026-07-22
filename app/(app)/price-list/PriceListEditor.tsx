@@ -38,8 +38,12 @@ function centsToEuroString(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+// Table-row inputs need to read as inputs at a glance (not just plain table
+// text), so they always carry a visible border/background -- mirroring the
+// standalone "new item" form inputs below, just slightly lighter so a dense
+// table of them doesn't look heavier than the rest of the page.
 const inputClass =
-  "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-[#0f172a] outline-none transition-colors focus:border-[#e9edf2] focus:bg-[#f4f6f8]";
+  "w-full min-w-0 rounded-lg border border-[#e9edf2] bg-[#f8fafc] px-2 py-1.5 text-sm text-[#0f172a] outline-none transition-colors focus:border-[#2563eb] focus:bg-white";
 
 export function PriceListEditor({ items: initialItems }: { items: PriceListItem[] }) {
   const { language } = useAppLanguage();
@@ -222,7 +226,7 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
         <Link
@@ -255,16 +259,20 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
         </div>
         {adjustMessage && <p className="text-sm text-[#16a34a]">{adjustMessage}</p>}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
-        <table className="w-full border-collapse text-left text-sm">
+      {/* overflow-x-auto (not overflow-hidden) so on narrow viewports the
+          table scrolls horizontally instead of squeezing/clipping columns;
+          min-w-[720px] keeps every column at a readable width even when the
+          viewport is narrower than that. */}
+      <div className="overflow-x-auto rounded-2xl border border-[#e9edf2] bg-white">
+        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[#e9edf2] text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
-              <th className="px-4 py-3">{t.colLabel}</th>
-              <th className="px-4 py-3">{t.colUnit}</th>
-              <th className="px-4 py-3">{t.colPrice}</th>
-              <th className="px-4 py-3">{t.colCategory}</th>
-              <th className="px-4 py-3">{t.colStock}</th>
-              <th className="px-4 py-3"></th>
+              <th className="px-4 py-3 w-[28%]">{t.colLabel}</th>
+              <th className="px-4 py-3 w-[10%]">{t.colUnit}</th>
+              <th className="px-4 py-3 w-[12%]">{t.colPrice}</th>
+              <th className="px-4 py-3 w-[16%]">{t.colCategory}</th>
+              <th className="px-4 py-3 w-[26%]">{t.colStock}</th>
+              <th className="px-4 py-3 w-[8%]"></th>
             </tr>
           </thead>
           <tbody>
@@ -283,7 +291,7 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
                     value={item.unit}
                     onChange={(e) => handleFieldChange(item.id, "unit", e.target.value)}
                     onBlur={() => handleBlurSave(item)}
-                    className={`w-24 ${inputClass}`}
+                    className={inputClass}
                   />
                 </td>
                 <td className="px-4 py-2">
@@ -298,7 +306,7 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
                       )
                     }
                     onBlur={() => handleBlurSave(item)}
-                    className={`w-24 font-mono ${inputClass}`}
+                    className={`font-mono ${inputClass}`}
                   />
                 </td>
                 <td className="px-4 py-2">
@@ -306,7 +314,7 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
                     value={item.category}
                     onChange={(e) => handleFieldChange(item.id, "category", e.target.value)}
                     onBlur={() => handleBlurSave(item)}
-                    className={`w-32 ${inputClass}`}
+                    className={inputClass}
                   />
                 </td>
                 <td className="px-4 py-2">
