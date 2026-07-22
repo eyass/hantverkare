@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/quote-expiry-reminders",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

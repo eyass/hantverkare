@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { generateLineItems, QuoteGenerationError } from "@/lib/quotes/generateLineItems";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
+import { buildLineItemsFromTemplate } from "@/lib/quoteTemplates/templateBuilder";
 
 export type GenerateQuoteState = { error: string | null };
 
@@ -106,6 +107,103 @@ export async function generateQuoteDraft(
   );
   if (lineItemsError) {
     console.error("Failed to insert line items:", lineItemsError);
+    await supabase.from("quotes").delete().eq("id", quote.id);
+    return { error: "Positionen konnten nicht gespeichert werden." };
+  }
+
+  redirect(`/quotes/${quote.id}`);
+}
+
+export type CreateFromTemplateResult = { error: string | null };
+
+/**
+ * Creates a new draft quote by copying a saved quote template's items in
+ * directly, skipping AI generation entirely -- the "insert from template"
+ * entry point for repeat job types (e.g. "Badezimmer Renovierung Standard").
+ */
+export async function createQuoteFromTemplate(
+  templateId: string,
+  customerId: string | null,
+): Promise<CreateFromTemplateResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: template, error: templateError } = await supabase
+    .from("quote_templates")
+    .select("id, name")
+    .eq("id", templateId)
+    .single();
+  if (templateError || !template) {
+    console.error("Failed to load quote template:", templateError);
+    return { error: "Vorlage konnte nicht geladen werden." };
+  }
+
+  const { data: templateItems, error: itemsError } = await supabase
+    .from("quote_template_items")
+    .select("id, template_id, label, unit, quantity, unit_price_cents")
+    .eq("template_id", templateId)
+    .order("sort_order");
+  if (itemsError || !templateItems) {
+    console.error("Failed to load quote template items:", itemsError);
+    return { error: "Vorlage konnte nicht geladen werden." };
+  }
+
+  const built = buildLineItemsFromTemplate(templateId, templateItems, 0);
+  if (built.error !== null) {
+    return { error: built.error };
+  }
+  if (built.rows.length === 0) {
+    return { error: "Diese Vorlage hat keine Positionen." };
+  }
+
+  const pricedItems = built.rows.map((row) => ({
+    description: row.description,
+    quantity: row.quantity,
+    unit: row.unit,
+    unitPriceCents: row.unit_price_cents,
+    lineTotalCents: row.line_total_cents,
+  }));
+  const totals = computeTotals(pricedItems);
+
+  const { data: quote, error: quoteError } = await supabase
+    .from("quotes")
+    .insert({
+      customer_description: `Aus Vorlage: ${template.name}`,
+      status: "draft",
+      subtotal_cents: totals.subtotalCents,
+      vat_cents: totals.vatCents,
+      total_cents: totals.totalCents,
+      organization_id: org.organizationId,
+      user_id: user.id,
+      customer_id: customerId,
+    })
+    .select("id")
+    .single();
+  if (quoteError || !quote) {
+    console.error("Failed to insert quote from template:", quoteError);
+    return { error: "Angebot konnte nicht gespeichert werden." };
+  }
+
+  const { error: lineItemsError } = await supabase.from("quote_line_items").insert(
+    built.rows.map((row) => ({
+      ...row,
+      quote_id: quote.id,
+      organization_id: org.organizationId,
+      user_id: user.id,
+    })),
+  );
+  if (lineItemsError) {
+    console.error("Failed to insert line items from template:", lineItemsError);
     await supabase.from("quotes").delete().eq("id", quote.id);
     return { error: "Positionen konnten nicht gespeichert werden." };
   }

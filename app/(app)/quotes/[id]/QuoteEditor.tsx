@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
+import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
 
 type LineItem = {
   id: string;
@@ -246,6 +247,8 @@ export function QuoteEditor({
           </a>
 
           {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
+
+          {isDraft && <SaveAsTemplateSection quoteId={quote.id} />}
         </div>
       </div>
     </div>
