@@ -19,6 +19,7 @@ export type TeamPermissions = {
   membersCanDeleteCustomers: boolean;
   membersCanViewBilling: boolean;
   membersCanEditBusinessSettings: boolean;
+  smsNotificationsEnabled: boolean;
 };
 
 export function TeamSettingsForm({
@@ -215,6 +216,30 @@ export function TeamSettingsForm({
             {permsNotice}
           </p>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Benachrichtigungen</h2>
+        <p className="mt-1 text-sm text-[#64748b]">
+          SMS-Versand verursacht Kosten pro Nachricht und ist deshalb standardmäßig
+          deaktiviert. Bei Aktivierung werden zusätzlich zur bestehenden
+          E-Mail-Benachrichtigung SMS verschickt (z. B. wenn ein Angebot
+          signiert wird oder bald abläuft), sofern eine Telefonnummer hinterlegt ist.
+        </p>
+        <ul className="mt-4 flex flex-col divide-y divide-[#e9edf2]">
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              SMS-Benachrichtigungen aktivieren
+            </span>
+            <input
+              type="checkbox"
+              checked={perms.smsNotificationsEnabled}
+              disabled={isPermsPending}
+              onChange={() => handleTogglePerm("smsNotificationsEnabled")}
+              className="h-5 w-5"
+            />
+          </li>
+        </ul>
       </section>
 
       {pendingInvites.length > 0 && (

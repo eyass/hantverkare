@@ -13,7 +13,7 @@ type PageHeroProps = {
 };
 
 /**
- * Shared dark, gradient-mesh hero band used at the top of every marketing
+ * Shared light, gradient-mesh hero band used at the top of every marketing
  * page for visual consistency (Home gets the full version with actions,
  * inner pages use `compact` for a shorter band).
  *
@@ -60,7 +60,7 @@ export function PageHero({ eyebrow, title, description, children, compact }: Pag
   const actionsRef = useHeroFadeInFallback(200);
 
   return (
-    <section className="relative overflow-hidden bg-[#020617]">
+    <section className="relative overflow-hidden bg-white">
       <GradientBackdrop />
       <div
         className={`relative mx-auto flex max-w-4xl flex-col items-center gap-6 px-4 text-center sm:px-8 ${
@@ -70,7 +70,7 @@ export function PageHero({ eyebrow, title, description, children, compact }: Pag
         {eyebrow && (
           <span
             ref={badgeRef as React.RefObject<HTMLSpanElement>}
-            className="hero-fade-in rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-blue-200 backdrop-blur"
+            className="hero-fade-in rounded-full border border-blue-100 bg-blue-50/80 px-4 py-1.5 text-xs font-medium tracking-wide text-blue-700 backdrop-blur"
             style={{ "--hero-fade-offset": "-8px" } as CSSProperties}
           >
             {eyebrow}
@@ -78,7 +78,7 @@ export function PageHero({ eyebrow, title, description, children, compact }: Pag
         )}
         <h1
           ref={h1Ref as React.RefObject<HTMLHeadingElement>}
-          className={`hero-fade-in font-semibold tracking-tight text-white ${
+          className={`hero-fade-in font-semibold tracking-tight text-[#0f172a] ${
             compact ? "text-3xl sm:text-4xl" : "text-4xl sm:text-6xl"
           }`}
           style={{ "--hero-fade-delay": "0.05s" } as CSSProperties}
@@ -88,7 +88,7 @@ export function PageHero({ eyebrow, title, description, children, compact }: Pag
         {description && (
           <p
             ref={pRef as React.RefObject<HTMLParagraphElement>}
-            className={`hero-fade-in max-w-2xl leading-8 text-slate-300 ${
+            className={`hero-fade-in max-w-2xl leading-8 text-[#475569] ${
               compact ? "text-base" : "text-lg sm:text-xl"
             }`}
             style={{ "--hero-fade-delay": "0.12s" } as CSSProperties}

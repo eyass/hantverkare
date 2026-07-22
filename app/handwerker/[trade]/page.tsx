@@ -80,7 +80,7 @@ export default async function TradePage({ params }: PageProps) {
           </Link>
           <Link
             href="/tool"
-            className="rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
+            className="rounded-xl border border-[#e2e8f0] bg-white/70 px-6 py-3 text-sm font-medium text-[#0f172a] backdrop-blur transition hover:bg-white"
           >
             So funktioniert&apos;s
           </Link>
@@ -153,16 +153,16 @@ export default async function TradePage({ params }: PageProps) {
       </section>
 
       <AnimatedSection className="mx-auto max-w-6xl px-4 pb-20 sm:px-8">
-        <div className="relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl bg-[#020617] p-8 text-center shadow-[0_24px_64px_rgba(2,6,23,0.35)] sm:p-14">
+        <div className="relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-blue-50 p-8 text-center shadow-[0_16px_48px_rgba(37,99,235,0.1)] sm:p-14">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.25),transparent_60%),radial-gradient(circle_at_80%_80%,rgba(29,78,216,0.35),transparent_55%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.18),transparent_60%),radial-gradient(circle_at_80%_80%,rgba(37,99,235,0.14),transparent_55%)]"
           />
           <div className="relative flex flex-col items-center gap-4">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            <h2 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
               Bereit, weniger Zeit mit Angeboten zu verbringen?
             </h2>
-            <p className="max-w-xl text-base leading-7 text-slate-300">
+            <p className="max-w-xl text-base leading-7 text-[#475569]">
               14 Tage kostenlos testen, danach 29 €/Monat. Jederzeit kündbar.
             </p>
             <Link

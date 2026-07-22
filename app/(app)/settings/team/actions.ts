@@ -79,6 +79,7 @@ export type TeamPermissionsInput = {
   membersCanDeleteCustomers: boolean;
   membersCanViewBilling: boolean;
   membersCanEditBusinessSettings: boolean;
+  smsNotificationsEnabled: boolean;
 };
 
 /**
@@ -114,6 +115,7 @@ export async function updateTeamPermissions(
       members_can_delete_customers: input.membersCanDeleteCustomers,
       members_can_view_billing: input.membersCanViewBilling,
       members_can_edit_business_settings: input.membersCanEditBusinessSettings,
+      sms_notifications_enabled: input.smsNotificationsEnabled,
     })
     .eq("id", org.organizationId);
 
