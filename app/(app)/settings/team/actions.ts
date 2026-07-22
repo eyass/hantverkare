@@ -86,6 +86,9 @@ export type TeamPermissionsInput = {
   dunningEscalationDays: number;
   dunningTone: "freundlich" | "neutral" | "streng";
   inventoryDecrementEnabled: boolean;
+  reviewRequestEnabled: boolean;
+  reviewRequestDays: number;
+  reviewPlatformUrl: string | null;
 };
 
 /**
@@ -129,6 +132,19 @@ export async function updateTeamPermissions(
     };
   }
 
+  // A review platform link is required to enable the toggle -- there'd be
+  // nowhere to send the customer otherwise, and the cron independently
+  // guards on this too (defense in depth, same "validate here even though
+  // the cron double-checks" reasoning as the dunning threshold check above).
+  if (input.reviewRequestEnabled && !input.reviewPlatformUrl?.trim()) {
+    return {
+      error: "Bitte hinterlege einen Bewertungslink, bevor du Bewertungsanfragen aktivierst.",
+    };
+  }
+  if (input.reviewRequestDays < 0) {
+    return { error: "Die Frist für Bewertungsanfragen darf nicht negativ sein." };
+  }
+
   const admin = createAdminClient();
   const { error } = await admin
     .from("organizations")
@@ -143,6 +159,9 @@ export async function updateTeamPermissions(
       dunning_escalation_days: input.dunningEscalationDays,
       dunning_tone: input.dunningTone,
       inventory_decrement_enabled: input.inventoryDecrementEnabled,
+      review_request_enabled: input.reviewRequestEnabled,
+      review_request_days: input.reviewRequestDays,
+      review_platform_url: input.reviewPlatformUrl?.trim() || null,
     })
     .eq("id", org.organizationId);
 

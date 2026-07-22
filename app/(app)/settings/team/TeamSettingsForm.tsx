@@ -26,6 +26,9 @@ export type TeamPermissions = {
   dunningEscalationDays: number;
   dunningTone: "freundlich" | "neutral" | "streng";
   inventoryDecrementEnabled: boolean;
+  reviewRequestEnabled: boolean;
+  reviewRequestDays: number;
+  reviewPlatformUrl: string | null;
 };
 
 export function TeamSettingsForm({
@@ -369,6 +372,58 @@ export function TeamSettingsForm({
               disabled={isPermsPending}
               onChange={() => handleTogglePerm("inventoryDecrementEnabled")}
               className="h-5 w-5"
+            />
+          </li>
+        </ul>
+      </section>
+
+      <section className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Bewertungsanfragen</h2>
+        <p className="mt-1 text-sm text-[#64748b]">
+          Standardmäßig deaktiviert. Bei Aktivierung erhält der Kunde nach der
+          hinterlegten Frist ab Zahlungseingang automatisch eine E-Mail mit der
+          Bitte um eine Bewertung (z. B. Google Business Profile, Trustpilot).
+          Ein Bewertungslink ist erforderlich, sonst bleibt die Funktion inaktiv.
+        </p>
+        <ul className="mt-4 flex flex-col divide-y divide-[#e9edf2]">
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Bewertungsanfragen aktivieren
+            </span>
+            <input
+              type="checkbox"
+              checked={perms.reviewRequestEnabled}
+              disabled={isPermsPending || !perms.reviewPlatformUrl?.trim()}
+              onChange={() => handleTogglePerm("reviewRequestEnabled")}
+              className="h-5 w-5"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">Bewertungslink</span>
+            <input
+              type="url"
+              defaultValue={perms.reviewPlatformUrl ?? ""}
+              disabled={isPermsPending}
+              placeholder="https://g.page/r/..."
+              onBlur={(e) =>
+                commitPerms({ ...perms, reviewPlatformUrl: e.target.value || null })
+              }
+              className="w-64 rounded-md border border-[#e9edf2] p-2 text-sm"
+            />
+          </li>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Anfrage senden nach (Tagen ab Zahlung)
+            </span>
+            <input
+              type="number"
+              min={0}
+              defaultValue={perms.reviewRequestDays}
+              disabled={isPermsPending || !perms.reviewRequestEnabled}
+              onBlur={(e) =>
+                commitPerms({ ...perms, reviewRequestDays: Number(e.target.value) })
+              }
+              className="w-20 rounded-md border border-[#e9edf2] p-2 text-right text-sm"
             />
           </li>
         </ul>
