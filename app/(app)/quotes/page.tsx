@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatExpiryBadge } from "@/lib/quotes/expiry";
+import { getOnboardingChecklistState } from "@/lib/organizations/getOnboardingChecklist";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -51,6 +53,8 @@ export default async function QuotesPage({
     (q) => q.status === "final" || q.status === "signed",
   ).length;
 
+  const checklistState = await getOnboardingChecklistState(supabase);
+
   const statusBadgeClasses: Record<string, string> = {
     draft: "bg-zinc-100 text-zinc-600",
     final: "bg-blue-50 text-blue-700",
@@ -90,6 +94,8 @@ export default async function QuotesPage({
           </Link>
         </div>
       </div>
+
+      <OnboardingChecklist state={checklistState} />
 
       <div className="grid grid-cols-3 gap-3">
         <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">

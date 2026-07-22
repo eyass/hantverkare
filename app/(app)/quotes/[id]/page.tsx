@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { QuoteEditor } from "./QuoteEditor";
+import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
+
+const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a page view
 
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,5 +32,32 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     .eq("quote_id", id)
     .maybeSingle();
 
-  return <QuoteEditor quote={quote} lineItems={lineItems ?? []} invoice={invoice ?? null} />;
+  const { data: photoRows } = await supabase
+    .from("quote_photos")
+    .select("id, storage_path, caption, quote_line_item_id")
+    .eq("quote_id", id)
+    .order("created_at", { ascending: false });
+
+  const photos = await Promise.all(
+    (photoRows ?? []).map(async (photo) => {
+      const { data: signed } = await supabase.storage
+        .from(QUOTE_PHOTOS_BUCKET)
+        .createSignedUrl(photo.storage_path, PHOTO_SIGNED_URL_TTL_SECONDS);
+      return {
+        id: photo.id,
+        url: signed?.signedUrl ?? null,
+        caption: photo.caption,
+        quote_line_item_id: photo.quote_line_item_id,
+      };
+    }),
+  );
+
+  return (
+    <QuoteEditor
+      quote={quote}
+      lineItems={lineItems ?? []}
+      invoice={invoice ?? null}
+      photos={photos}
+    />
+  );
 }
