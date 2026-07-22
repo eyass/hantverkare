@@ -6,6 +6,7 @@ import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { generateLineItems, QuoteGenerationError } from "@/lib/quotes/generateLineItems";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { buildLineItemsFromTemplate } from "@/lib/quoteTemplates/templateBuilder";
+import { matchPriceListItemId } from "@/lib/inventory/matchPriceListItem";
 
 export type GenerateQuoteState = { error: string | null; queuedOffline?: boolean };
 
@@ -42,7 +43,7 @@ export async function generateQuoteDraft(
 
   const { data: priceList, error: priceListError } = await supabase
     .from("price_list_items")
-    .select("label, unit, unit_price_cents, category");
+    .select("id, label, unit, unit_price_cents, category");
   if (priceListError || !priceList) {
     console.error("Failed to load price list:", priceListError);
     return { error: "Preisliste konnte nicht geladen werden." };
@@ -103,6 +104,13 @@ export async function generateQuoteDraft(
       position: index,
       organization_id: org.organizationId,
       user_id: user.id,
+      // Best-effort link back to the price list item this was priced from
+      // (see lib/inventory/matchPriceListItem.ts) -- powers stock decrement
+      // on signing. Null is expected/fine when no confident match is found.
+      price_list_item_id: matchPriceListItemId(
+        { description: item.description, unit: item.unit, unitPriceCents: item.unitPriceCents },
+        priceList,
+      ),
     })),
   );
   if (lineItemsError) {
@@ -166,6 +174,15 @@ export async function createQuoteFromTemplate(
     return { error: "Diese Vorlage hat keine Positionen." };
   }
 
+  // Best-effort price-list link for template-sourced items too (same
+  // reasoning as the AI-generated path above).
+  const { data: priceList, error: priceListError } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit, unit_price_cents");
+  if (priceListError) {
+    console.error("Failed to load price list for template match:", priceListError);
+  }
+
   const pricedItems = built.rows.map((row) => ({
     description: row.description,
     quantity: row.quantity,
@@ -200,6 +217,10 @@ export async function createQuoteFromTemplate(
       quote_id: quote.id,
       organization_id: org.organizationId,
       user_id: user.id,
+      price_list_item_id: matchPriceListItemId(
+        { description: row.description, unit: row.unit, unitPriceCents: row.unit_price_cents },
+        priceList ?? [],
+      ),
     })),
   );
   if (lineItemsError) {

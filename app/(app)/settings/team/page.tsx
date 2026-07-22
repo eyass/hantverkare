@@ -64,6 +64,7 @@ export default async function TeamSettingsPage() {
           dunningMahnungDays: 10,
           dunningEscalationDays: 24,
           dunningTone: "neutral",
+          inventoryDecrementEnabled: false,
         }
       }
     />

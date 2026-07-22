@@ -85,6 +85,7 @@ export type TeamPermissionsInput = {
   dunningMahnungDays: number;
   dunningEscalationDays: number;
   dunningTone: "freundlich" | "neutral" | "streng";
+  inventoryDecrementEnabled: boolean;
 };
 
 /**
@@ -141,6 +142,7 @@ export async function updateTeamPermissions(
       dunning_mahnung_days: input.dunningMahnungDays,
       dunning_escalation_days: input.dunningEscalationDays,
       dunning_tone: input.dunningTone,
+      inventory_decrement_enabled: input.inventoryDecrementEnabled,
     })
     .eq("id", org.organizationId);
 

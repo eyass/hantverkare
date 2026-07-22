@@ -25,6 +25,7 @@ export type TeamPermissions = {
   dunningMahnungDays: number;
   dunningEscalationDays: number;
   dunningTone: "freundlich" | "neutral" | "streng";
+  inventoryDecrementEnabled: boolean;
 };
 
 export function TeamSettingsForm({
@@ -345,6 +346,30 @@ export function TeamSettingsForm({
               <option value="neutral">Neutral</option>
               <option value="streng">Streng</option>
             </select>
+          </li>
+        </ul>
+      </section>
+
+      <section className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+        <h2 className="text-lg font-medium text-[#0f172a]">Lagerbestand</h2>
+        <p className="mt-1 text-sm text-[#64748b]">
+          Standardmäßig deaktiviert. Bei Aktivierung wird der Lagerbestand von
+          Preislistenpositionen automatisch verringert, sobald ein Kunde ein
+          Angebot unterschreibt (nur für Positionen, bei denen die
+          Bestandsverfolgung in der Preisliste aktiviert ist).
+        </p>
+        <ul className="mt-4 flex flex-col divide-y divide-[#e9edf2]">
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-[#0f172a]">
+              Lagerbestand bei Unterschrift automatisch verringern
+            </span>
+            <input
+              type="checkbox"
+              checked={perms.inventoryDecrementEnabled}
+              disabled={isPermsPending}
+              onChange={() => handleTogglePerm("inventoryDecrementEnabled")}
+              className="h-5 w-5"
+            />
           </li>
         </ul>
       </section>
