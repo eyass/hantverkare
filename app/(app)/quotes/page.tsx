@@ -15,6 +15,19 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("de-DE");
 }
 
+function formatJobDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const UPCOMING_JOBS_LIMIT = 5;
+
+
 export default async function QuotesPage({
   searchParams,
 }: {
@@ -54,6 +67,26 @@ export default async function QuotesPage({
   const language = await getUserLanguage(supabase);
   const t = QUOTES_DICTIONARY[language];
   const STATUS_LABELS = t.status;
+
+  // "Anstehende Termine" widget (issue #124): this repo has no dedicated
+  // dashboard route, so the quotes list -- the closest thing to a home
+  // screen for authenticated users -- surfaces the next few upcoming
+  // scheduled jobs, with links to each quote and to the full /schedule view.
+  const { data: upcomingJobsRaw, error: upcomingJobsError } = await supabase
+    .from("scheduled_jobs")
+    .select("id, scheduled_start, quote_id, quotes(customer_description)")
+    .gte("scheduled_start", new Date().toISOString())
+    .order("scheduled_start", { ascending: true })
+    .limit(UPCOMING_JOBS_LIMIT);
+  if (upcomingJobsError) {
+    console.error("Failed to load upcoming scheduled jobs:", upcomingJobsError);
+  }
+  const upcomingJobs = (upcomingJobsRaw ?? []) as unknown as {
+    id: string;
+    scheduled_start: string;
+    quote_id: string;
+    quotes: { customer_description: string } | null;
+  }[];
 
   const statusBadgeClasses: Record<string, string> = {
     draft: "bg-zinc-100 text-zinc-600",
@@ -97,6 +130,31 @@ export default async function QuotesPage({
       </div>
 
       <OnboardingChecklist state={checklistState} />
+
+      {upcomingJobs.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#0f172a]">{t.upcomingJobsTitle}</h2>
+            <Link href="/schedule" className="text-xs font-medium text-[#2563eb] hover:underline">
+              {t.upcomingJobsViewAll}
+            </Link>
+          </div>
+          <div className="flex flex-col gap-2">
+            {upcomingJobs.map((job) => (
+              <Link
+                key={job.id}
+                href={`/quotes/${job.quote_id}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-[#e9edf2] bg-[#f8fafc] px-3 py-2 text-sm transition-colors hover:bg-[#f1f5f9]"
+              >
+                <span className="truncate text-[#0f172a]">{job.quotes?.customer_description ?? t.upcomingJobFallbackLabel}</span>
+                <span className="font-mono shrink-0 text-xs text-[#64748b]">
+                  {formatJobDateTime(job.scheduled_start)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3">
         <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">

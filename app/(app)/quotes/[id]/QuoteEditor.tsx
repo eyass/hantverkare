@@ -8,6 +8,7 @@ import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { computeProfitability } from "@/lib/quotes/profitability";
 import { PhotosSection } from "./PhotosSection";
+import { ScheduleSection } from "./ScheduleSection";
 
 type LineItem = {
   id: string;
@@ -48,6 +49,13 @@ type Photo = {
   quote_line_item_id: string | null;
 };
 
+type ScheduledJob = {
+  id: string;
+  scheduled_start: string;
+  scheduled_end: string | null;
+  notes: string | null;
+};
+
 function statusLabel(status: string): string {
   if (status === "declined") return "Abgelehnt";
   if (status === "final") return "Final";
@@ -80,12 +88,14 @@ export function QuoteEditor({
   invoice,
   photos,
   warranty,
+  scheduledJob,
 }: {
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
   photos: Photo[];
   warranty: WarrantyRecord | null;
+  scheduledJob: ScheduledJob | null;
 }) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
@@ -343,6 +353,8 @@ export function QuoteEditor({
           {isDraft && <SaveAsTemplateSection quoteId={quote.id} />}
         </div>
       </div>
+
+      {status === "signed" && <ScheduleSection quoteId={quote.id} job={scheduledJob} />}
 
       <PhotosSection
         quoteId={quote.id}

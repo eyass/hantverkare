@@ -98,3 +98,16 @@ export function buildDunningSmsBody(
   }
   return `Letzte Mahnung: Rechnung ${invoiceNumber} über ${amount} weiterhin unbeglichen. Bitte umgehend begleichen, sonst drohen weitere Schritte.`;
 }
+
+/** Builds the "your job is scheduled for tomorrow" SMS body for the customer. */
+export function buildJobReminderSmsBody(scheduledStart: string, quoteDescription: string): string {
+  const when = new Date(scheduledStart).toLocaleString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const descriptionSnippet = truncate(quoteDescription, 100);
+  return `Ihr Termin ist morgen, ${when}. Auftrag: ${descriptionSnippet}`;
+}

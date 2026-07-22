@@ -40,6 +40,12 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     .eq("quote_id", id)
     .maybeSingle();
 
+  const { data: scheduledJob } = await supabase
+    .from("scheduled_jobs")
+    .select("id, scheduled_start, scheduled_end, notes")
+    .eq("quote_id", id)
+    .maybeSingle();
+
   const { data: photoRows } = await supabase
     .from("quote_photos")
     .select("id, storage_path, caption, quote_line_item_id")
@@ -67,6 +73,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       invoice={invoice ?? null}
       photos={photos}
       warranty={warranty ?? null}
+      scheduledJob={scheduledJob ?? null}
     />
   );
 }
