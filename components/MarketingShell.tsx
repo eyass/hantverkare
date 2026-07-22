@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "/", label: "Start" },
   { href: "/tool", label: "Das Tool" },
   { href: "/pricing", label: "Preise" },
+  { href: "/blog", label: "Blog" },
   { href: "/faq", label: "FAQ" },
   { href: "/about", label: "Über uns" },
 ];
@@ -75,6 +76,9 @@ export function MarketingFooter() {
             </Link>
             <Link href="/pricing" className="transition hover:text-white">
               Preise
+            </Link>
+            <Link href="/blog" className="transition hover:text-white">
+              Blog
             </Link>
             <Link href="/faq" className="transition hover:text-white">
               FAQ
