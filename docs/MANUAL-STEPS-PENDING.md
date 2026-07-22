@@ -14,6 +14,13 @@ record — nothing in this section is actionable anymore.
 **The only thing still open is Stripe going live** (see that section below) — everything
 else in this file is done.
 
+## New: `0012_quote_templates.sql` needs manual application
+
+PR for issue #48 (quote templates / reusable line-item bundles) adds
+`supabase/migrations/0012_quote_templates.sql`, creating `quote_templates` and
+`quote_template_items` (org-scoped RLS via `is_org_member`). Once that PR is merged,
+run this migration file in the Supabase SQL editor, the same way 0004–0011 were applied.
+
 ## Migrations — all applied (0004 → 0011)
 
 Reference only; these already ran, in order, in the Supabase SQL editor.
