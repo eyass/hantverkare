@@ -3,6 +3,7 @@ import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildOrganizationSchema } from "@/lib/seo/schema";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({
@@ -29,6 +30,11 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "hantverkare",
+  },
 };
 
 export default function RootLayout({
@@ -44,6 +50,7 @@ export default function RootLayout({
       <body className="min-h-full">
         <JsonLd schema={buildOrganizationSchema()} />
         {children}
+        <ServiceWorkerRegister />
         <Analytics />
       </body>
     </html>
