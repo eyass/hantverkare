@@ -6,6 +6,7 @@ import { getOrgMembers } from "@/lib/organizations/getOrgMembers";
 import { QuoteEditor } from "./QuoteEditor";
 import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 import { getUpsellSuggestions } from "./actions";
+import { getCostEstimationSuggestions } from "@/lib/quotes/getCostEstimationSuggestions";
 
 const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a page view
 
@@ -36,13 +37,29 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
+    .select(
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, price_list_item_id",
+    )
     .eq("quote_id", id)
     .order("position");
   if (lineItemsError) {
     console.error("Failed to load line items for quote", id, lineItemsError);
     notFound();
   }
+
+  // Soft, dismissible cost suggestions (issue #160) -- read-only, never
+  // blocks the page if it fails.
+  const costSuggestions = org
+    ? await getCostEstimationSuggestions(supabase, {
+        organizationId: org.organizationId,
+        quoteId: id,
+        lineItems: (lineItems ?? []).map((item) => ({
+          id: item.id,
+          price_list_item_id: item.price_list_item_id,
+          unit_price_cents: item.unit_price_cents,
+        })),
+      })
+    : {};
 
   const { data: invoice } = await supabase
     .from("invoices")
@@ -105,6 +122,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       members={members}
       upsellSuggestions={upsellSuggestions}
       comments={commentRows ?? []}
+      costSuggestions={costSuggestions}
     />
   );
 }
