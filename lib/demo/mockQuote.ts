@@ -27,8 +27,10 @@ export type DemoQuote = {
 
 const VAT_RATE = 0.19;
 
+export type DemoJobId = "bathroom" | "kitchen-faucet" | "electrical" | "painting" | "flooring";
+
 type JobTemplate = {
-  id: string;
+  id: DemoJobId;
   label: string;
   keywords: string[];
   items: Array<{ description: string; quantity: number; unit: string; unitPriceCents: number }>;
@@ -105,23 +107,53 @@ function priceItem(item: {
   return { ...item, lineTotalCents: Math.round(item.quantity * item.unitPriceCents) };
 }
 
-/** Very small keyword match — good enough for a canned demo, not a real classifier. */
-export function matchJobTemplate(description: string): JobTemplate {
-  const text = description.trim().toLowerCase();
-  if (!text) return DEFAULT_TEMPLATE;
-
-  let best: { template: JobTemplate; score: number } | null = null;
-  for (const template of DEMO_JOB_TEMPLATES) {
-    const score = template.keywords.reduce((count, keyword) => (text.includes(keyword) ? count + 1 : count), 0);
-    if (score > 0 && (!best || score > best.score)) {
-      best = { template, score };
-    }
-  }
-  return best?.template ?? DEFAULT_TEMPLATE;
+export function getJobTemplateById(id: DemoJobId): JobTemplate {
+  return DEMO_JOB_TEMPLATES.find((template) => template.id === id) ?? DEFAULT_TEMPLATE;
 }
 
-export function generateDemoQuote(description: string): DemoQuote {
-  const template = matchJobTemplate(description);
+/**
+ * Templates preferred for a given trade page (see lib/trades/config.ts
+ * `demoJobIds`), in priority order. Used to bias `matchJobTemplate` on trade
+ * landing pages so the demo stays on-topic even for ambiguous free text.
+ */
+export function getJobTemplatesForTrade(jobIds: DemoJobId[]): JobTemplate[] {
+  return jobIds.map(getJobTemplateById);
+}
+
+/**
+ * Very small keyword match — good enough for a canned demo, not a real
+ * classifier. When `preferredJobIds` is given (trade landing pages), matches
+ * are restricted to that trade's templates first; only if none of them score
+ * at all do we fall back to the full template set, and finally to the first
+ * preferred template (or the global default) if nothing matches at all.
+ */
+export function matchJobTemplate(description: string, preferredJobIds?: DemoJobId[]): JobTemplate {
+  const text = description.trim().toLowerCase();
+  const fallback = preferredJobIds?.length ? getJobTemplateById(preferredJobIds[0]) : DEFAULT_TEMPLATE;
+  if (!text) return fallback;
+
+  function bestMatch(candidates: JobTemplate[]): { template: JobTemplate; score: number } | null {
+    let best: { template: JobTemplate; score: number } | null = null;
+    for (const template of candidates) {
+      const score = template.keywords.reduce((count, keyword) => (text.includes(keyword) ? count + 1 : count), 0);
+      if (score > 0 && (!best || score > best.score)) {
+        best = { template, score };
+      }
+    }
+    return best;
+  }
+
+  if (preferredJobIds?.length) {
+    const preferred = bestMatch(getJobTemplatesForTrade(preferredJobIds));
+    if (preferred) return preferred.template;
+  }
+
+  const global = bestMatch(DEMO_JOB_TEMPLATES);
+  return global?.template ?? fallback;
+}
+
+export function generateDemoQuote(description: string, preferredJobIds?: DemoJobId[]): DemoQuote {
+  const template = matchJobTemplate(description, preferredJobIds);
   const items = template.items.map(priceItem);
   const subtotalCents = items.reduce((sum, item) => sum + item.lineTotalCents, 0);
   const vatCents = Math.round(subtotalCents * VAT_RATE);

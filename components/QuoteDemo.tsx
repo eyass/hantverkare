@@ -3,20 +3,41 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { generateDemoQuote, formatCents, DEMO_JOB_TEMPLATES, type DemoQuote } from "@/lib/demo/mockQuote";
+import {
+  generateDemoQuote,
+  formatCents,
+  DEMO_JOB_TEMPLATES,
+  getJobTemplatesForTrade,
+  type DemoQuote,
+  type DemoJobId,
+} from "@/lib/demo/mockQuote";
 
-const EXAMPLE_JOBS = [
+const DEFAULT_EXAMPLE_JOBS = [
   DEMO_JOB_TEMPLATES[0].label,
   DEMO_JOB_TEMPLATES[1].label,
   DEMO_JOB_TEMPLATES[3].label,
 ];
 
-export function QuoteDemo() {
-  const [description, setDescription] = useState("");
+type QuoteDemoProps = {
+  /**
+   * When set (trade landing pages), biases keyword matching toward these
+   * canned job templates and shows trade-relevant example buttons/default
+   * text instead of the generic homepage set.
+   */
+  preferredJobIds?: DemoJobId[];
+  defaultDescription?: string;
+};
+
+export function QuoteDemo({ preferredJobIds, defaultDescription = "" }: QuoteDemoProps = {}) {
+  const [description, setDescription] = useState(defaultDescription);
   const [quote, setQuote] = useState<DemoQuote | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const shouldReduceMotion = useReducedMotion();
   const resultRef = useRef<HTMLDivElement>(null);
+
+  const exampleJobs = preferredJobIds?.length
+    ? getJobTemplatesForTrade(preferredJobIds).map((template) => template.label)
+    : DEFAULT_EXAMPLE_JOBS;
 
   // Same class of bug fixed in AnimatedSection/PageHero: a framer-motion
   // mount tween (`initial`/`animate`) can freeze mid-flight under
@@ -46,7 +67,7 @@ export function QuoteDemo() {
     // Simulate the AI generation delay of the real tool without calling any
     // server — this demo runs entirely client-side.
     window.setTimeout(() => {
-      setQuote(generateDemoQuote(input));
+      setQuote(generateDemoQuote(input, preferredJobIds));
       setIsGenerating(false);
     }, 700);
   }
@@ -68,7 +89,7 @@ export function QuoteDemo() {
         />
       </div>
       <div className="flex flex-wrap gap-2">
-        {EXAMPLE_JOBS.map((job) => (
+        {exampleJobs.map((job) => (
           <button
             key={job}
             type="button"
