@@ -22,6 +22,12 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     .single();
   if (!quote) notFound();
 
+  const { data: commentRows } = await supabase
+    .from("quote_comments")
+    .select("id, author_type, author_name, body, created_at")
+    .eq("quote_id", id)
+    .order("created_at", { ascending: true });
+
   // Members list for the "assign to" selector (issue #128). Emails require
   // the admin client (see getOrgMembers); the assign action itself still
   // re-validates membership server-side, this is just for the dropdown.
@@ -98,6 +104,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       scheduledJob={scheduledJob ?? null}
       members={members}
       upsellSuggestions={upsellSuggestions}
+      comments={commentRows ?? []}
     />
   );
 }

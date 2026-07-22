@@ -12,6 +12,8 @@ import { computeProfitability } from "@/lib/quotes/profitability";
 import { PhotosSection } from "./PhotosSection";
 import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
+import { CommentsSection } from "./CommentsSection";
+import type { QuoteCommentRow } from "./actions";
 
 type LineItem = {
   id: string;
@@ -119,6 +121,7 @@ export function QuoteEditor({
   scheduledJob,
   members,
   upsellSuggestions,
+  comments,
 }: {
   quote: Quote;
   lineItems: LineItem[];
@@ -129,6 +132,7 @@ export function QuoteEditor({
   scheduledJob: ScheduledJob | null;
   members: Member[];
   upsellSuggestions: UpsellSuggestion[];
+  comments: QuoteCommentRow[];
 }) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
@@ -491,6 +495,8 @@ export function QuoteEditor({
         initialEnabled={quote.gallery_enabled}
         hasPhotos={photos.length > 0}
       />
+
+      <CommentsSection quoteId={quote.id} comments={comments} />
     </div>
   );
 }
