@@ -38,9 +38,14 @@ type ActionResult = { error: string | null };
  *     /account-deleted, a route OUTSIDE the (app) layout group -- this matters
  *     because (app)/layout.tsx calls ensureOrganization(), which would
  *     otherwise silently enroll the now-orgless user into a brand new empty
- *     org the moment they were routed back into the app. Signing out first
- *     means proxy.ts's auth check bounces any subsequent (app) request to
- *     /login before the layout (and ensureOrganization) ever runs.
+ *     org the moment they were routed back into the app. What actually
+ *     prevents that: (app)/layout.tsx calls `supabase.auth.getUser()` itself
+ *     and returns early (`if (!user) return children;`) BEFORE it ever calls
+ *     ensureOrganization(). Signing out here means that check fails on any
+ *     subsequent (app) request, so ensureOrganization() never runs for the
+ *     deleted user. (lib/supabase/middleware.ts's proxy only gates
+ *     `/quotes` and `/price-list`, not `/settings` or the (app) group in
+ *     general, so it is not what protects this path.)
  */
 export async function deleteOrganization(
   confirmationText: string,
@@ -113,8 +118,10 @@ export async function deleteOrganization(
     }
   }
 
-  // Always invalidate the current session so proxy.ts bounces the next (app)
-  // request to /login before ensureOrganization() can auto-create a new org.
+  // Always invalidate the current session so the next (app) request fails
+  // (app)/layout.tsx's own `getUser()` check and returns early, before
+  // ensureOrganization() can auto-create a new org. (Not proxy.ts -- its
+  // PROTECTED_PREFIXES only cover /quotes and /price-list.)
   await supabase.auth.signOut();
 
   redirect("/account-deleted");
