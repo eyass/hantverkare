@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
+import { PhotosSection } from "./PhotosSection";
 
 type LineItem = {
   id: string;
@@ -34,6 +35,13 @@ type Invoice = {
   total_cents: number;
 };
 
+type Photo = {
+  id: string;
+  url: string | null;
+  caption: string | null;
+  quote_line_item_id: string | null;
+};
+
 function statusLabel(status: string): string {
   if (status === "final") return "Final";
   if (status === "signed") return "Signiert";
@@ -54,10 +62,12 @@ export function QuoteEditor({
   quote,
   lineItems,
   invoice,
+  photos,
 }: {
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
+  photos: Photo[];
 }) {
   const [items, setItems] = useState(lineItems);
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
@@ -251,6 +261,12 @@ export function QuoteEditor({
           {isDraft && <SaveAsTemplateSection quoteId={quote.id} />}
         </div>
       </div>
+
+      <PhotosSection
+        quoteId={quote.id}
+        lineItems={items.map((item) => ({ id: item.id, description: item.description }))}
+        photos={photos}
+      />
     </div>
   );
 }
