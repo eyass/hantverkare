@@ -5,6 +5,7 @@ import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { getOrgMembers } from "@/lib/organizations/getOrgMembers";
 import { QuoteEditor } from "./QuoteEditor";
 import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
+import { getUpsellSuggestions } from "./actions";
 
 const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a page view
 
@@ -81,6 +82,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     }),
   );
 
+  // Upsell suggestions (issue #159) only make sense while the quote is still
+  // a draft being built -- a finalized/signed quote's items are locked, so
+  // there's nothing left to add.
+  const upsellSuggestions = quote.status === "draft" ? await getUpsellSuggestions(id) : [];
+
   return (
     <QuoteEditor
       quote={quote}
@@ -91,6 +97,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       warranty={warranty ?? null}
       scheduledJob={scheduledJob ?? null}
       members={members}
+      upsellSuggestions={upsellSuggestions}
     />
   );
 }
