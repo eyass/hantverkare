@@ -47,6 +47,10 @@ export const DICTIONARY = {
       listening: "hört zu…",
       recognised: "✓ erkannt",
       replay: "Demo erneut abspielen",
+      itemsTitle: "Angebot",
+      subtotal: "Zwischensumme",
+      vat: "zzgl. MwSt.",
+      total: "Gesamt",
     },
     trust: {
       label: "Gebaut für",
@@ -271,6 +275,10 @@ export const DICTIONARY = {
       listening: "listening…",
       recognised: "✓ recognised",
       replay: "Replay demo",
+      itemsTitle: "Quote",
+      subtotal: "Subtotal",
+      vat: "plus VAT",
+      total: "Total",
     },
     trust: {
       label: "Built for",
