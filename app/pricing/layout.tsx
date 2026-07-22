@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildSoftwareApplicationSchema } from "@/lib/seo/schema";
 
 const TITLE = "Preise: 29 €/Monat, 14 Tage kostenlos testen";
 const DESCRIPTION =
@@ -23,5 +25,10 @@ export const metadata: Metadata = {
 };
 
 export default function PricingLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <>
+      <JsonLd schema={buildSoftwareApplicationSchema()} />
+      {children}
+    </>
+  );
 }

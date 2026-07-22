@@ -6,6 +6,8 @@ import { PageHero } from "@/components/marketing/PageHero";
 import { AnimatedSection } from "@/components/marketing/AnimatedSection";
 import { QuoteFlowIllustration } from "@/components/marketing/illustrations/QuoteFlowIllustration";
 import { MicIcon, SparkleCalcIcon, SignatureIcon } from "@/components/marketing/illustrations/FeatureIcons";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildSoftwareApplicationSchema } from "@/lib/seo/schema";
 
 const STEPS = [
   {
@@ -56,6 +58,7 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <MarketingShell>
+      <JsonLd schema={buildSoftwareApplicationSchema()} />
       <PageHero
         eyebrow="14 Tage kostenlos testen"
         title={
