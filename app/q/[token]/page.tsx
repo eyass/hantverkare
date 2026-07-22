@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignForm } from "./SignForm";
 import { DeclineForm } from "./DeclineForm";
+import { CommentsThread } from "./CommentsThread";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -49,6 +50,12 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     console.error("Failed to load line items for public quote", quote.id, lineItemsError);
     notFound();
   }
+
+  const { data: commentRows } = await supabase
+    .from("quote_comments")
+    .select("id, author_type, author_name, body, created_at")
+    .eq("quote_id", quote.id)
+    .order("created_at", { ascending: true });
 
   return (
     <div className="min-h-screen bg-[#0f172a] px-4 py-10 sm:px-8">
@@ -118,6 +125,8 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
             </p>
           </div>
         )}
+
+        <CommentsThread token={token} initialComments={commentRows ?? []} />
       </div>
     </div>
   );
