@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { getAllPosts } from '@/lib/blog/posts'
+import { TRADE_SLUGS } from '@/lib/trades/config'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
@@ -52,6 +53,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: post.date ? new Date(post.date) : lastModified,
       changeFrequency: 'monthly' as const,
       priority: 0.6,
+    })),
+    ...TRADE_SLUGS.map((trade) => ({
+      url: `${BASE_URL}/handwerker/${trade}`,
+      lastModified,
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
     })),
   ]
 }
