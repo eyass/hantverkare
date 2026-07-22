@@ -13,6 +13,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/quotes", label: "Angebote" },
   { href: "/customers", label: "Kunden" },
   { href: "/price-list", label: "Preisliste" },
+  { href: "/quote-templates", label: "Vorlagen" },
   { href: "/reports", label: "Berichte" },
   { href: "/settings", label: "Einstellungen" },
 ];
