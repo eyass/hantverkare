@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote, assignQuote, addSuggestedLineItem } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
@@ -9,6 +9,7 @@ import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
 import type { ContractInterval } from "@/lib/contracts/interval";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { computeProfitability } from "@/lib/quotes/profitability";
+import type { CostEstimationSuggestion } from "@/lib/quotes/costEstimation";
 import { PhotosSection } from "./PhotosSection";
 import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
@@ -24,6 +25,7 @@ type LineItem = {
   cost_cents: number | null;
   line_total_cents: number;
   position: number;
+  price_list_item_id?: string | null;
 };
 
 type Quote = {
@@ -122,6 +124,7 @@ export function QuoteEditor({
   members,
   upsellSuggestions,
   comments,
+  costSuggestions = {},
 }: {
   quote: Quote;
   lineItems: LineItem[];
@@ -133,8 +136,10 @@ export function QuoteEditor({
   members: Member[];
   upsellSuggestions: UpsellSuggestion[];
   comments: QuoteCommentRow[];
+  costSuggestions?: Record<string, CostEstimationSuggestion>;
 }) {
   const [items, setItems] = useState(lineItems);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<Set<string>>(new Set());
   const [lastSavedItems, setLastSavedItems] = useState(lineItems);
   const [totals, setTotals] = useState({
     subtotalCents: quote.subtotal_cents,
@@ -303,8 +308,12 @@ export function QuoteEditor({
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
+              {items.map((item) => {
+                const suggestion = costSuggestions[item.id];
+                const showSuggestion = suggestion !== undefined && !dismissedSuggestionIds.has(item.id);
+                return (
+                <Fragment key={item.id}>
+                <tr className="border-b border-[#e9edf2] last:border-b-0">
                   <td className="px-4 py-2">
                     <input
                       value={item.description}
@@ -364,7 +373,37 @@ export function QuoteEditor({
                     {formatEuros(item.line_total_cents)}
                   </td>
                 </tr>
-              ))}
+                {showSuggestion && (
+                  <tr key={`${item.id}-suggestion`} className="border-b border-[#e9edf2] last:border-b-0 bg-amber-50">
+                    <td colSpan={6} className="px-4 py-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+                        <span>
+                          Ähnliche Positionen aus früheren Aufträgen kosteten im Schnitt{" "}
+                          <strong className="font-mono">{formatEuros(suggestion.avgActualCostUnitCents)}</strong> pro
+                          Einheit, kalkuliert waren im Schnitt{" "}
+                          <strong className="font-mono">{formatEuros(suggestion.avgQuotedUnitCents)}</strong> (
+                          {suggestion.sampleSize} Aufträge). Preis anpassen?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDismissedSuggestionIds((prev) => {
+                              const next = new Set(prev);
+                              next.add(item.id);
+                              return next;
+                            })
+                          }
+                          className="shrink-0 rounded-full px-2 py-1 font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                        >
+                          Verwerfen
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
           {isDraft && suggestions.length > 0 && (
