@@ -65,14 +65,14 @@ export default function AboutPage() {
       </section>
 
       <AnimatedSection className="mx-auto max-w-3xl px-4 pb-20 sm:px-8">
-        <div className="relative flex flex-col items-center gap-3 overflow-hidden rounded-3xl bg-[#020617] p-8 text-center shadow-[0_24px_64px_rgba(2,6,23,0.3)] sm:p-12">
+        <div className="relative flex flex-col items-center gap-3 overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-blue-50 p-8 text-center shadow-[0_16px_48px_rgba(37,99,235,0.1)] sm:p-12">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(96,165,250,0.25),transparent_60%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(96,165,250,0.18),transparent_60%)]"
           />
           <div className="relative flex flex-col items-center gap-3">
-            <h2 className="text-xl font-semibold text-white">Lerne hantverkare kennen</h2>
-            <p className="text-sm text-slate-300">14 Tage kostenlos testen, danach 29 €/Monat.</p>
+            <h2 className="text-xl font-semibold text-[#0f172a]">Lerne hantverkare kennen</h2>
+            <p className="text-sm text-[#475569]">14 Tage kostenlos testen, danach 29 €/Monat.</p>
             <Link
               href="/login"
               className="mt-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-[0_6px_20px_rgba(37,99,235,0.4)] transition hover:from-blue-400 hover:to-blue-600"

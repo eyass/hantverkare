@@ -15,15 +15,15 @@ const NAV_LINKS = [
 
 export function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#020617]/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-20 border-b border-[#e9edf2] bg-white/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
-        <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
+        <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-[#0f172a]">
           <LogoMark />
           hantverkare
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-medium text-slate-300 md:flex">
+        <nav className="hidden items-center gap-6 text-sm font-medium text-[#475569] md:flex">
           {NAV_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className="transition hover:text-white">
+            <Link key={link.href} href={link.href} className="transition hover:text-[#0f172a]">
               {link.label}
             </Link>
           ))}
@@ -31,7 +31,7 @@ export function MarketingHeader() {
         <div className="flex items-center gap-2">
           <Link
             href="/login"
-            className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+            className="rounded-xl border border-[#e2e8f0] px-4 py-2 text-sm font-medium text-[#0f172a] transition hover:bg-[#f4f6f8]"
           >
             Anmelden
           </Link>
@@ -43,9 +43,9 @@ export function MarketingHeader() {
           </Link>
         </div>
       </div>
-      <nav className="flex items-center gap-4 overflow-x-auto border-t border-white/10 px-4 py-2 text-sm font-medium text-slate-300 md:hidden">
+      <nav className="flex items-center gap-4 overflow-x-auto border-t border-[#e9edf2] px-4 py-2 text-sm font-medium text-[#475569] md:hidden">
         {NAV_LINKS.map((link) => (
-          <Link key={link.href} href={link.href} className="shrink-0 transition hover:text-white">
+          <Link key={link.href} href={link.href} className="shrink-0 transition hover:text-[#0f172a]">
             {link.label}
           </Link>
         ))}
@@ -56,46 +56,46 @@ export function MarketingHeader() {
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-white/10 bg-[#020617]">
+    <footer className="border-t border-[#e9edf2] bg-[#f8fafc]">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-14 sm:flex-row sm:items-start sm:justify-between sm:px-8">
         <AnimatedSection className="flex flex-col gap-3">
-          <span className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
+          <span className="flex items-center gap-2 text-lg font-semibold tracking-tight text-[#0f172a]">
             <LogoMark />
             hantverkare
           </span>
-          <p className="max-w-xs text-sm leading-6 text-slate-400">
+          <p className="max-w-xs text-sm leading-6 text-[#64748b]">
             KI-gestützte Angebote für Handwerker — Auftrag beschreiben, Angebot in unter einer
             Minute, Kunde unterschreibt digital.
           </p>
         </AnimatedSection>
-        <div className="flex gap-12 text-sm text-slate-400">
+        <div className="flex gap-12 text-sm text-[#64748b]">
           <div className="flex flex-col gap-2">
-            <span className="font-medium text-white">Produkt</span>
-            <Link href="/tool" className="transition hover:text-white">
+            <span className="font-medium text-[#0f172a]">Produkt</span>
+            <Link href="/tool" className="transition hover:text-[#0f172a]">
               Das Tool
             </Link>
-            <Link href="/pricing" className="transition hover:text-white">
+            <Link href="/pricing" className="transition hover:text-[#0f172a]">
               Preise
             </Link>
-            <Link href="/blog" className="transition hover:text-white">
+            <Link href="/blog" className="transition hover:text-[#0f172a]">
               Blog
             </Link>
-            <Link href="/faq" className="transition hover:text-white">
+            <Link href="/faq" className="transition hover:text-[#0f172a]">
               FAQ
             </Link>
           </div>
           <div className="flex flex-col gap-2">
-            <span className="font-medium text-white">Unternehmen</span>
-            <Link href="/about" className="transition hover:text-white">
+            <span className="font-medium text-[#0f172a]">Unternehmen</span>
+            <Link href="/about" className="transition hover:text-[#0f172a]">
               Über uns
             </Link>
-            <Link href="/login" className="transition hover:text-white">
+            <Link href="/login" className="transition hover:text-[#0f172a]">
               Anmelden
             </Link>
           </div>
         </div>
       </div>
-      <div className="border-t border-white/10 px-4 py-4 text-center text-xs text-slate-500 sm:px-8">
+      <div className="border-t border-[#e9edf2] px-4 py-4 text-center text-xs text-[#94a3b8] sm:px-8">
         © {new Date().getFullYear()} hantverkare. Alle Preise inkl. MwSt.
       </div>
     </footer>
