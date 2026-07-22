@@ -48,6 +48,19 @@ export default async function CustomerDetailPage({
     console.error("Failed to load customer quotes:", quotesError);
   }
 
+  // Warranty expiry dates for this customer's signed jobs (#127), keyed by
+  // quote_id so they can be looked up per row below.
+  const { data: warranties, error: warrantiesError } = await supabase
+    .from("warranty_records")
+    .select("quote_id, warranty_expiry_date")
+    .eq("customer_id", id);
+  if (warrantiesError) {
+    console.error("Failed to load warranty records:", warrantiesError);
+  }
+  const warrantyExpiryByQuoteId = new Map(
+    (warranties ?? []).map((w) => [w.quote_id, w.warranty_expiry_date]),
+  );
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
@@ -80,6 +93,11 @@ export default async function CustomerDetailPage({
                 <span className="font-mono text-xs text-[#94a3b8]">
                   {formatDate(quote.created_at)}
                 </span>
+                {warrantyExpiryByQuoteId.has(quote.id) && (
+                  <span className="font-mono text-xs text-[#64748b]">
+                    Gewährleistung bis {formatDate(warrantyExpiryByQuoteId.get(quote.id)!)}
+                  </span>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="font-mono text-sm text-[#0f172a]">

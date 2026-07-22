@@ -39,10 +39,48 @@ export async function signQuote(token: string, signerName: string): Promise<Sign
     .eq("share_token", token)
     .eq("status", "final")
     .is("declined_at", null)
-    .select("id, user_id, customer_description, organization_id");
+    .select("id, user_id, customer_description, organization_id, customer_id, signed_at");
   if (error || !data || data.length === 0) {
     console.error("Failed to sign quote:", error);
     return { error: "Angebot konnte nicht unterschrieben werden. Es ist möglicherweise nicht mehr verfügbar." };
+  }
+
+  // Auto-generate the Gewährleistung (warranty) record for this job (#127).
+  // Best-effort, like the notifications below: the customer has already
+  // successfully signed at this point, so a failure here must never be
+  // surfaced as a signing failure. Scope/date/line-items are all derived
+  // from data already captured on the quote -- no new user input.
+  try {
+    const quote = data[0];
+    const { data: lineItems, error: lineItemsError } = await supabase
+      .from("quote_line_items")
+      .select("description, quantity, unit, unit_price_cents, line_total_cents")
+      .eq("quote_id", quote.id)
+      .order("position");
+    if (lineItemsError) {
+      console.error("Failed to load line items for warranty record:", lineItemsError);
+    } else {
+      const startDate = new Date(quote.signed_at ?? Date.now());
+      const warrantyPeriodMonths = 24; // German statutory minimum (BGB §634a) -- see 0020_warranty_records.sql
+      const expiryDate = new Date(startDate);
+      expiryDate.setMonth(expiryDate.getMonth() + warrantyPeriodMonths);
+
+      const { error: warrantyError } = await supabase.from("warranty_records").insert({
+        user_id: quote.user_id,
+        quote_id: quote.id,
+        customer_id: quote.customer_id,
+        scope_description: quote.customer_description ?? "",
+        line_items_snapshot: lineItems ?? [],
+        warranty_start_date: startDate.toISOString().slice(0, 10),
+        warranty_period_months: warrantyPeriodMonths,
+        warranty_expiry_date: expiryDate.toISOString().slice(0, 10),
+      });
+      if (warrantyError) {
+        console.error("Failed to create warranty record:", warrantyError);
+      }
+    }
+  } catch (warrantyErr) {
+    console.error("Failed to create warranty record:", warrantyErr);
   }
 
   // Best-effort notification only -- must never affect the result returned to the
