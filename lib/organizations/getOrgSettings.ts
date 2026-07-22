@@ -4,6 +4,7 @@ export type OrgPermissionSettings = {
   membersCanDeleteCustomers: boolean;
   membersCanViewBilling: boolean;
   membersCanEditBusinessSettings: boolean;
+  smsNotificationsEnabled: boolean;
 };
 
 /**
@@ -22,7 +23,7 @@ export async function getOrgSettings(
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "members_can_delete_customers, members_can_view_billing, members_can_edit_business_settings",
+      "members_can_delete_customers, members_can_view_billing, members_can_edit_business_settings, sms_notifications_enabled",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -36,5 +37,6 @@ export async function getOrgSettings(
     membersCanDeleteCustomers: data.members_can_delete_customers,
     membersCanViewBilling: data.members_can_view_billing,
     membersCanEditBusinessSettings: data.members_can_edit_business_settings,
+    smsNotificationsEnabled: data.sms_notifications_enabled,
   };
 }

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignForm } from "./SignForm";
+import { DeclineForm } from "./DeclineForm";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -16,7 +17,9 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
 
   const { data: quote } = await supabase
     .from("quotes")
-    .select("id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name")
+    .select(
+      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name, declined_at, decline_reason",
+    )
     .eq("share_token", token)
     .single();
   if (!quote) notFound();
@@ -92,12 +95,26 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
           </p>
         </div>
 
-        {quote.status === "final" && <SignForm token={token} />}
+        {quote.status === "final" && !quote.declined_at && (
+          <>
+            <SignForm token={token} />
+            <DeclineForm token={token} />
+          </>
+        )}
 
-        {quote.status === "signed" && (
+        {quote.status === "signed" && !quote.declined_at && (
           <div className="rounded-2xl bg-[#dcfce7] p-6 text-center">
             <p className="text-sm font-medium text-[#16a34a]">
               Signiert am {quote.signed_at ? formatDate(quote.signed_at) : "-"} von {quote.signer_name ?? "-"}.
+            </p>
+          </div>
+        )}
+
+        {quote.declined_at && (
+          <div className="rounded-2xl bg-[#fee2e2] p-6 text-center">
+            <p className="text-sm font-medium text-[#b91c1c]">
+              Abgelehnt am {formatDate(quote.declined_at)}.
+              {quote.decline_reason ? ` Grund: ${quote.decline_reason}` : ""}
             </p>
           </div>
         )}
