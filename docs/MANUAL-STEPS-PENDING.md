@@ -506,3 +506,15 @@ possible (same email rate-limit blocker as above). Please eyeball:
   phone screen (this is the page real customers see)
 - [ ] `/settings`, `/customers`, `/customers/[id]`, `/price-list` — card styling,
   delete-button visibility/contrast
+
+## Price list wizard — visual QA needed
+
+- [ ] Apply migration `0011_price_list_templates.sql` in the Supabase SQL editor
+  (after 0010).
+- [ ] `/price-list` with zero items shows the trade-picker wizard, not the empty table.
+- [ ] Picking a trade shows its checklist with all items checked and default prices filled in.
+- [ ] Unchecking an item excludes it from the inserted list.
+- [ ] Editing a price in the review step is reflected in the saved item.
+- [ ] "Zurück" returns to the trade picker without losing template data.
+- [ ] "Leer starten" goes straight to the existing manual editor.
+- [ ] `/price-list` with existing items shows the normal editor, no wizard.
