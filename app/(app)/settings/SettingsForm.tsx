@@ -13,8 +13,10 @@ type BusinessSettings = {
 
 export function SettingsForm({
   initialSettings,
+  referralUrl,
 }: {
   initialSettings: BusinessSettings | null;
+  referralUrl: string | null;
 }) {
   const [companyName, setCompanyName] = useState(initialSettings?.company_name ?? "");
   const [address, setAddress] = useState(initialSettings?.address ?? "");
@@ -23,6 +25,18 @@ export function SettingsForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopyReferralLink() {
+    if (!referralUrl) return;
+    try {
+      await navigator.clipboard.writeText(referralUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy referral link:", err);
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,6 +134,31 @@ export function SettingsForm({
           </Link>
         </div>
       </div>
+
+      {referralUrl && (
+        <div className="rounded-2xl border border-[#e9edf2] bg-white p-6">
+          <h2 className="text-base font-semibold text-[#0f172a]">Dein Empfehlungslink</h2>
+          <p className="mt-1.5 text-sm text-[#64748b]">
+            Empfiehl uns weiter: Wenn sich jemand über deinen Link anmeldet und ein
+            bezahltes Abo startet, bekommt ihr beide einen Monat kostenlos dazu.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              readOnly
+              value={referralUrl}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 rounded-xl border border-[#e9edf2] bg-[#f4f6f8] p-2.5 text-sm font-normal text-[#0f172a] outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleCopyReferralLink}
+              className="rounded-xl border border-[#e9edf2] px-4 py-2.5 text-sm font-semibold text-[#0f172a] hover:bg-[#f4f6f8]"
+            >
+              {copied ? "Kopiert!" : "Link kopieren"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-[#e9edf2] bg-white p-6">
         <h2 className="text-base font-semibold text-[#0f172a]">Meine Daten</h2>
