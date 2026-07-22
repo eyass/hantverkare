@@ -6,7 +6,9 @@ export default async function PriceListPage() {
   const supabase = await createClient();
   const { data: items, error } = await supabase
     .from("price_list_items")
-    .select("id, label, unit, unit_price_cents, category")
+    .select(
+      "id, label, unit, unit_price_cents, category, track_stock, stock_quantity, low_stock_threshold",
+    )
     .order("category")
     .order("label");
 

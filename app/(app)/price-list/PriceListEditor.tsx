@@ -8,6 +8,7 @@ import {
   updatePriceListItem,
   deletePriceListItem,
   bulkAdjustPriceListPrices,
+  restockPriceListItem,
   type PriceListItemInput,
 } from "./actions";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
@@ -19,7 +20,19 @@ type PriceListItem = {
   unit: string;
   unit_price_cents: number;
   category: string;
+  track_stock: boolean;
+  stock_quantity: number | null;
+  low_stock_threshold: number | null;
 };
+
+function isLowStock(item: PriceListItem): boolean {
+  return (
+    item.track_stock &&
+    item.stock_quantity !== null &&
+    item.low_stock_threshold !== null &&
+    item.stock_quantity <= item.low_stock_threshold
+  );
+}
 
 function centsToEuroString(cents: number): string {
   return (cents / 100).toFixed(2);
@@ -36,6 +49,7 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
   const [lastSavedItems, setLastSavedItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ label: "", unit: "", unitPrice: "", category: "" });
+  const [restockAmounts, setRestockAmounts] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
   const [adjustPercent, setAdjustPercent] = useState("");
   const [adjustMessage, setAdjustMessage] = useState<string | null>(null);
@@ -102,15 +116,42 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
 
   function handleFieldChange(
     id: string,
-    field: "label" | "unit" | "unit_price_cents" | "category",
+    field: "label" | "unit" | "unit_price_cents" | "category" | "low_stock_threshold",
     value: string,
   ) {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
-          ? { ...item, [field]: field === "unit_price_cents" ? Number(value) : value }
+          ? {
+              ...item,
+              [field]:
+                field === "unit_price_cents"
+                  ? Number(value)
+                  : field === "low_stock_threshold"
+                    ? value.trim().length === 0
+                      ? null
+                      : Number(value)
+                    : value,
+            }
           : item,
       ),
+    );
+  }
+
+  function handleToggleTrackStock(id: string) {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const nextTrackStock = !item.track_stock;
+        // Turning tracking on for the first time seeds a starting count of 0
+        // rather than leaving it null (null means "not tracked" -- once
+        // tracking is on, "unknown" isn't a useful stock_quantity anymore).
+        const nextStockQuantity =
+          nextTrackStock && item.stock_quantity === null ? 0 : item.stock_quantity;
+        const next = { ...item, track_stock: nextTrackStock, stock_quantity: nextStockQuantity };
+        handleBlurSave(next);
+        return next;
+      }),
     );
   }
 
@@ -121,6 +162,9 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
         unit: item.unit,
         unitPriceCents: item.unit_price_cents,
         category: item.category,
+        trackStock: item.track_stock,
+        stockQuantity: item.stock_quantity,
+        lowStockThreshold: item.low_stock_threshold,
       });
       if (result.error !== null) {
         setError(result.error);
@@ -133,6 +177,34 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
       }
       setError(null);
       setLastSavedItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+    });
+  }
+
+  function handleRestock(id: string) {
+    const raw = restockAmounts[id] ?? "";
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Menge muss größer als 0 sein.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await restockPriceListItem(id, amount);
+      if (result.error !== null) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, stock_quantity: result.stockQuantity } : item,
+        ),
+      );
+      setLastSavedItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, stock_quantity: result.stockQuantity } : item,
+        ),
+      );
+      setRestockAmounts((prev) => ({ ...prev, [id]: "" }));
     });
   }
 
@@ -191,6 +263,7 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
               <th className="px-4 py-3">{t.colUnit}</th>
               <th className="px-4 py-3">{t.colPrice}</th>
               <th className="px-4 py-3">{t.colCategory}</th>
+              <th className="px-4 py-3">{t.colStock}</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -235,6 +308,83 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
                     onBlur={() => handleBlurSave(item)}
                     className={`w-32 ${inputClass}`}
                   />
+                </td>
+                <td className="px-4 py-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2 text-xs text-[#64748b]">
+                      <input
+                        type="checkbox"
+                        checked={item.track_stock}
+                        onChange={() => handleToggleTrackStock(item.id)}
+                        className="h-4 w-4"
+                      />
+                      Bestand verfolgen
+                    </label>
+                    {item.track_stock && (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            value={item.stock_quantity ?? ""}
+                            onChange={(e) =>
+                              setItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id
+                                    ? {
+                                        ...i,
+                                        stock_quantity:
+                                          e.target.value.trim().length === 0
+                                            ? null
+                                            : Number(e.target.value),
+                                      }
+                                    : i,
+                                ),
+                              )
+                            }
+                            onBlur={() => handleBlurSave(item)}
+                            placeholder="Bestand"
+                            className={`w-20 font-mono ${inputClass}`}
+                          />
+                          {isLowStock(item) && (
+                            <span className="rounded-full bg-[#fef2f2] px-2 py-0.5 text-xs font-medium text-[#dc2626]">
+                              Niedrig
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          value={item.low_stock_threshold ?? ""}
+                          onChange={(e) =>
+                            handleFieldChange(item.id, "low_stock_threshold", e.target.value)
+                          }
+                          onBlur={() => handleBlurSave(item)}
+                          placeholder="Meldebestand"
+                          className={`w-20 font-mono ${inputClass}`}
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            value={restockAmounts[item.id] ?? ""}
+                            onChange={(e) =>
+                              setRestockAmounts((prev) => ({
+                                ...prev,
+                                [item.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Menge"
+                            className="w-16 rounded-lg border border-[#e9edf2] px-2 py-1 text-xs font-mono outline-none focus:border-[#2563eb]"
+                          />
+                          <button
+                            onClick={() => handleRestock(item.id)}
+                            disabled={isPending}
+                            className="rounded-full border border-[#e9edf2] px-2.5 py-1 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50"
+                          >
+                            Auffüllen
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-2">
                   <button

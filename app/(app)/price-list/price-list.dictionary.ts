@@ -6,6 +6,7 @@ export type PriceListCopy = {
   colUnit: string;
   colPrice: string;
   colCategory: string;
+  colStock: string;
   delete: string;
   newItemTitle: string;
   labelPlaceholder: string;
@@ -32,6 +33,7 @@ export const PRICE_LIST_DICTIONARY: Dictionary<PriceListCopy> = {
     colUnit: "Einheit",
     colPrice: "Preis (EUR)",
     colCategory: "Kategorie",
+    colStock: "Lagerbestand",
     delete: "Löschen",
     newItemTitle: "Neue Position",
     labelPlaceholder: "Bezeichnung",
@@ -58,6 +60,7 @@ export const PRICE_LIST_DICTIONARY: Dictionary<PriceListCopy> = {
     colUnit: "Unit",
     colPrice: "Price (EUR)",
     colCategory: "Category",
+    colStock: "Stock",
     delete: "Delete",
     newItemTitle: "New item",
     labelPlaceholder: "Description",
