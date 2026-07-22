@@ -15,7 +15,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
+    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
     .eq("quote_id", id)
     .order("position");
   if (lineItemsError) {

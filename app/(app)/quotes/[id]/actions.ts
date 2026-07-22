@@ -10,6 +10,7 @@ type UpdateLineItemInput = {
   quantity: number;
   unit: string;
   unitPriceCents: number;
+  costCents?: number | null;
 };
 
 type LineItemRow = {
@@ -18,6 +19,7 @@ type LineItemRow = {
   quantity: number;
   unit: string;
   unit_price_cents: number;
+  cost_cents: number | null;
   line_total_cents: number;
   position: number;
 };
@@ -37,6 +39,10 @@ export async function updateLineItem(
 ): Promise<UpdateLineItemResult> {
   if (input.quantity <= 0 || input.unitPriceCents <= 0 || !Number.isInteger(input.unitPriceCents)) {
     return { error: "Menge und Preis müssen größer als 0 sein." };
+  }
+  const costCents = input.costCents ?? null;
+  if (costCents !== null && (!Number.isInteger(costCents) || costCents < 0)) {
+    return { error: "Kosten müssen 0 oder größer sein." };
   }
 
   const supabase = await createClient();
@@ -64,6 +70,7 @@ export async function updateLineItem(
       quantity: priced.quantity,
       unit: priced.unit,
       unit_price_cents: priced.unitPriceCents,
+      cost_cents: costCents,
       line_total_cents: priced.lineTotalCents,
     })
     .eq("id", lineItemId)
@@ -74,7 +81,7 @@ export async function updateLineItem(
 
   const { data: allItems, error: fetchError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
+    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
     .eq("quote_id", quoteId)
     .order("position");
   if (fetchError || !allItems) {

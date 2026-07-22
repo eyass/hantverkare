@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote } from "./actions";
 import { InvoiceSection } from "./InvoiceSection";
 import { SaveAsTemplateSection } from "./SaveAsTemplateSection";
+import { computeProfitability } from "@/lib/quotes/profitability";
 
 type LineItem = {
   id: string;
@@ -11,6 +12,7 @@ type LineItem = {
   quantity: number;
   unit: string;
   unit_price_cents: number;
+  cost_cents: number | null;
   line_total_cents: number;
   position: number;
 };
@@ -50,6 +52,14 @@ function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 }
 
+function formatPercent(ratio: number): string {
+  return ratio.toLocaleString("de-DE", { style: "percent", maximumFractionDigits: 1 });
+}
+
+function centsToEuroString(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
 export function QuoteEditor({
   quote,
   lineItems,
@@ -70,10 +80,13 @@ export function QuoteEditor({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isDraft = status === "draft";
+  const profitability = computeProfitability(
+    items.map((item) => ({ lineTotalCents: item.line_total_cents, costCents: item.cost_cents })),
+  );
 
   function handleFieldChange(
     itemId: string,
-    field: "description" | "quantity" | "unit_price_cents",
+    field: "description" | "quantity" | "unit_price_cents" | "cost_cents",
     value: string,
   ) {
     setItems((prev) =>
@@ -81,7 +94,12 @@ export function QuoteEditor({
         item.id === itemId
           ? {
               ...item,
-              [field]: field === "quantity" || field === "unit_price_cents" ? Number(value) : value,
+              [field]:
+                field === "quantity" || field === "unit_price_cents" || field === "cost_cents"
+                  ? field === "cost_cents" && value === ""
+                    ? null
+                    : Number(value)
+                  : value,
             }
           : item,
       ),
@@ -95,6 +113,7 @@ export function QuoteEditor({
         quantity: item.quantity,
         unit: item.unit,
         unitPriceCents: item.unit_price_cents,
+        costCents: item.cost_cents,
       });
       if (result.error !== null) {
         setError(result.error);
@@ -148,6 +167,9 @@ export function QuoteEditor({
                 <th className="px-4 py-3 font-medium">Menge</th>
                 <th className="px-4 py-3 font-medium">Einheit</th>
                 <th className="px-4 py-3 font-medium">Einzelpreis</th>
+                <th className="px-4 py-3 font-medium">
+                  Kosten (intern)
+                </th>
                 <th className="px-4 py-3 font-medium">Gesamt</th>
               </tr>
             </thead>
@@ -190,6 +212,25 @@ export function QuoteEditor({
                       className="font-mono w-24 rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
                     />
                   </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="optional"
+                      value={item.cost_cents === null ? "" : centsToEuroString(item.cost_cents)}
+                      disabled={!isDraft}
+                      onChange={(e) =>
+                        handleFieldChange(
+                          item.id,
+                          "cost_cents",
+                          e.target.value === "" ? "" : String(Math.round(Number(e.target.value) * 100)),
+                        )
+                      }
+                      onBlur={() => handleBlurSave(item)}
+                      className="font-mono w-24 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-[#64748b] transition-colors placeholder:text-[#cbd5e1] focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
+                    />
+                  </td>
                   <td className="font-mono px-4 py-2 font-medium text-[#0f172a]">
                     {formatEuros(item.line_total_cents)}
                   </td>
@@ -214,6 +255,32 @@ export function QuoteEditor({
               <span>Gesamt</span>
               <span className="font-mono">{formatEuros(totals.totalCents)}</span>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-xl border border-[#e9edf2] bg-[#f8fafc] p-4 text-sm">
+            <span className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+              Rohertrag (intern, nicht für Kunden sichtbar)
+            </span>
+            {profitability.itemsWithCostCount === 0 ? (
+              <span className="text-[#64748b]">–</span>
+            ) : (
+              <>
+                <div className="flex justify-between text-[#64748b]">
+                  <span>Marge</span>
+                  <span className="font-mono text-[#0f172a]">
+                    {formatEuros(profitability.marginCents)}
+                    {profitability.marginPercent !== null && (
+                      <> ({formatPercent(profitability.marginPercent)})</>
+                    )}
+                  </span>
+                </div>
+                {profitability.hasIncompleteData && (
+                  <span className="text-xs text-[#94a3b8]">
+                    Unvollständig: nicht für alle Positionen sind Kosten hinterlegt.
+                  </span>
+                )}
+              </>
+            )}
           </div>
 
           {isDraft && (
