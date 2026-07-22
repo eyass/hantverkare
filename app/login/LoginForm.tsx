@@ -6,9 +6,11 @@ import { sendMagicLink, type LoginState } from "./actions";
 export function LoginForm({
   initialError,
   next,
+  ref,
 }: {
   initialError: string | null;
   next: string | null;
+  ref?: string | null;
 }) {
   const initialState: LoginState = { error: initialError, sent: false };
   const [state, formAction, isPending] = useActionState(sendMagicLink, initialState);
@@ -23,6 +25,7 @@ export function LoginForm({
       ) : (
         <form action={formAction} className="flex flex-col gap-4">
           {next && <input type="hidden" name="next" value={next} />}
+          {ref && <input type="hidden" name="ref" value={ref} />}
           <label htmlFor="email" className="text-sm font-medium">
             E-Mail-Adresse
           </label>

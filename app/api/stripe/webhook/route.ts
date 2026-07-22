@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient } from "@/lib/stripe/client";
+import { grantReferralRewardIfDue } from "@/lib/referrals/grantReferralReward";
 
 // Billing is per-organization (see 0010). New Checkout sessions/subscriptions
 // carry metadata.organization_id. Subscriptions created before the multi-user
@@ -64,7 +65,16 @@ async function updateBillingForSubscription(
 
   if (error) {
     console.error("Failed to update billing from webhook:", error);
+    return;
   }
+
+  // Additive only: grants the referral reward (issue #79) if -- and only if
+  // -- this org has a pending referral and this is a genuine first-time
+  // "active" status. No-op (same behavior as before this feature existed)
+  // for every org with no referral, and a guarded no-op if the reward was
+  // already granted. See lib/referrals/grantReferralReward.ts for the
+  // idempotency guarantee.
+  await grantReferralRewardIfDue(supabase, organizationId, subscription.status);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -124,7 +134,14 @@ export async function POST(request: Request): Promise<Response> {
 
       if (error) {
         console.error("Failed to update billing after checkout:", error);
+        break;
       }
+
+      // Additive only (issue #79): see the comment on grantReferralRewardIfDue
+      // in updateBillingForSubscription below -- same reasoning applies here.
+      // subscription_status is hardcoded "active" above, which is exactly the
+      // genuine-activation signal the reward requires.
+      await grantReferralRewardIfDue(supabase, organizationId, "active");
       break;
     }
 

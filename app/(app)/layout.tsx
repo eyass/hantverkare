@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/logout/actions";
@@ -68,8 +68,16 @@ export default async function AuthenticatedLayout({
 
   // Resolve (or create, for a brand-new signup) the user's organization before
   // anything else -- it's the scoping key everything downstream relies on, and
-  // billing is now per-organization.
-  const org = await ensureOrganization(user.id);
+  // billing is now per-organization. The referral_code cookie (issue #79,
+  // set by app/login/actions.ts when the magic link was requested via
+  // /login?ref=CODE) is only ever consulted by ensureOrganization on its
+  // brand-new-org path -- it's a no-op for every existing user. We
+  // deliberately do not clear the cookie here: Server Components cannot set
+  // cookies (only Server Actions/Route Handlers can), and there is no
+  // correctness need to -- ensureOrganization only records a referral once,
+  // the very first time an org is created for this user, ever.
+  const referralCode = (await cookies()).get("referral_code")?.value ?? null;
+  const org = await ensureOrganization(user.id, referralCode);
   if (!org) {
     // Could not establish an org (e.g. transient DB error). Render without the
     // shell rather than crashing; the next request retries.
