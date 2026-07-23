@@ -8,8 +8,12 @@ import { syncInvoiceToLexoffice } from "@/lib/integrations/lexoffice/sync";
 import { createInvoiceCheckoutSession } from "@/lib/stripe/connect";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
-import { generateLineItems, QuoteGenerationError, type RiskFlag } from "@/lib/quotes/generateLineItems";
-import { matchPriceListItemId } from "@/lib/inventory/matchPriceListItem";
+import {
+  generateLineItems,
+  QuoteGenerationError,
+  type RiskFlag,
+  type GeneratedLineItem,
+} from "@/lib/quotes/generateLineItems";
 import { buildClarifyingQuestionsUpdate, buildResolvedTimestamp } from "@/lib/quotes/clarifyingQuestions";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 import { computeNextDueDate, isValidContractInterval, type ContractInterval } from "@/lib/contracts/interval";
@@ -96,7 +100,9 @@ export async function updateLineItem(
 
   const { data: allItems, error: fetchError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
+    .select(
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning",
+    )
     .eq("quote_id", quoteId)
     .order("position");
   if (fetchError || !allItems) {
@@ -648,6 +654,7 @@ export async function regenerateQuoteDraft(
     generated = await generateLineItems(
       nextDescription,
       priceList.map((p) => ({
+        id: p.id,
         label: p.label,
         unit: p.unit,
         unitPriceCents: p.unit_price_cents,
@@ -662,7 +669,12 @@ export async function regenerateQuoteDraft(
     throw err;
   }
 
-  const pricedItems = generated.lineItems.map(priceLineItem);
+  const pricedItems = generated.lineItems.map((item: GeneratedLineItem) => ({
+    ...priceLineItem(item),
+    itemType: item.itemType,
+    quantityReasoning: item.quantityReasoning,
+    priceListItemId: item.priceListItemId,
+  }));
   const totals = computeTotals(pricedItems);
 
   const { error: updateError } = await supabase
@@ -713,13 +725,18 @@ export async function regenerateQuoteDraft(
         position: index,
         organization_id: org.organizationId,
         user_id: user.id,
-        price_list_item_id: matchPriceListItemId(
-          { description: item.description, unit: item.unit, unitPriceCents: item.unitPriceCents },
-          priceList,
-        ),
+        // Deterministic link back to the price list item this was priced
+        // from (issue #200) -- see generateQuoteDraft in
+        // app/(app)/quotes/new/actions.ts for the full trust-boundary
+        // reasoning; the same resolution applies here.
+        price_list_item_id: item.priceListItemId,
+        item_type: item.itemType,
+        quantity_reasoning: item.quantityReasoning,
       })),
     )
-    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position");
+    .select(
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning",
+    );
   if (insertError || !insertedItems) {
     console.error("Failed to insert regenerated line items:", insertError);
     return { error: "Positionen konnten nicht gespeichert werden." };
@@ -1255,7 +1272,9 @@ export async function addSuggestedLineItem(
 
   const { data: allItems, error: fetchError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position")
+    .select(
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning",
+    )
     .eq("quote_id", quoteId)
     .order("position");
   if (fetchError || !allItems) {

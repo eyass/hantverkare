@@ -29,6 +29,8 @@ type LineItem = {
   line_total_cents: number;
   position: number;
   price_list_item_id?: string | null;
+  item_type?: "labor" | "material" | null;
+  quantity_reasoning?: string | null;
 };
 
 type Quote = {
@@ -349,13 +351,29 @@ export function QuoteEditor({
                 <Fragment key={item.id}>
                 <tr className="border-b border-[#e9edf2] last:border-b-0">
                   <td className="px-4 py-2">
-                    <input
-                      value={item.description}
-                      disabled={!isDraft}
-                      onChange={(e) => handleFieldChange(item.id, "description", e.target.value)}
-                      onBlur={() => handleBlurSave(item)}
-                      className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
-                    />
+                    <div className="flex items-center gap-2">
+                      {item.item_type && (
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                            item.item_type === "labor"
+                              ? "bg-blue-50 text-blue-700"
+                              : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {item.item_type === "labor" ? "Arbeit" : "Material"}
+                        </span>
+                      )}
+                      <input
+                        value={item.description}
+                        disabled={!isDraft}
+                        onChange={(e) => handleFieldChange(item.id, "description", e.target.value)}
+                        onBlur={() => handleBlurSave(item)}
+                        className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+                    {item.quantity_reasoning && (
+                      <p className="px-2 pt-0.5 text-xs text-[#94a3b8]">{item.quantity_reasoning}</p>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <input
