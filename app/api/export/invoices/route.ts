@@ -22,7 +22,7 @@ export async function GET() {
   const { data: invoices, error } = await supabase
     .from("invoices")
     .select(
-      "invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, quotes(customer_description, customers(name))",
+      "id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, quotes(customer_description, customers(name))",
     )
     .order("issued_at", { ascending: false });
 
@@ -56,6 +56,16 @@ export async function GET() {
   });
 
   const csv = toCsv(headers, rows);
+
+  // Append-only audit log entry for this export event (see
+  // supabase/migrations/0034_gobd_invoice_compliance.sql). Not awaited-as-fatal:
+  // a failed audit-log write should not block the export itself.
+  const invoiceIds = (invoices ?? []).map((i) => i.id);
+  if (invoiceIds.length > 0) {
+    supabase.rpc("log_invoice_export", { p_invoice_ids: invoiceIds, p_format: "csv" }).then(({ error: logError }) => {
+      if (logError) console.error("Failed to log invoice export event:", logError);
+    });
+  }
 
   return new NextResponse(csv, {
     status: 200,
