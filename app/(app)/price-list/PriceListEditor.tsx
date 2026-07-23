@@ -229,12 +229,20 @@ export function PriceListEditor({ items: initialItems }: { items: PriceListItem[
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6 sm:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
-        <Link
-          href="/price-list/import"
-          className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
-        >
-          {t.importCsv}
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/price-list/import/supplier"
+            className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+          >
+            {t.supplierPriceUpdate}
+          </Link>
+          <Link
+            href="/price-list/import"
+            className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+          >
+            {t.importCsv}
+          </Link>
+        </div>
       </div>
       {error && <p className="text-sm text-[#dc2626]">{error}</p>}
       <div className="flex flex-col gap-3 rounded-2xl border border-[#e9edf2] bg-white p-6">
