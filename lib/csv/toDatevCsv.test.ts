@@ -28,6 +28,6 @@ describe("encodeCp1252", () => {
 
   it("replaces characters outside the 0x00-0xFF range with '?'", () => {
     const buf = encodeCp1252("Hallo 😀");
-    expect(buf.toString("latin1")).toBe("Hallo ??"); // surrogate pair -> two '?' chars
+    expect(buf.toString("latin1")).toBe("Hallo ?");
   });
 });

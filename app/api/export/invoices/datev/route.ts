@@ -90,7 +90,7 @@ export async function GET() {
     });
   }
 
-  return new NextResponse(bytes, {
+  return new NextResponse(new Uint8Array(bytes), {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=windows-1252",

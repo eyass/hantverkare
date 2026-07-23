@@ -1,4 +1,4 @@
-import { toDatevCsv } from "@/lib/csv/toDatevCsv";
+import { toDatevCsv } from "../csv/toDatevCsv";
 
 // DATEV EXTF "Rechnungsdaten" export -- v1 from the design spec
 // (docs/superpowers/specs/2026-07-22-gobd-datev-export-design.md, section
