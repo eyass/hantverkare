@@ -8,6 +8,7 @@ export function SignForm({ token }: { token: string }) {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signed, setSigned] = useState(false);
+  const [depositCheckoutUrl, setDepositCheckoutUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -28,15 +29,31 @@ export function SignForm({ token }: { token: string }) {
       }
       setError(null);
       setSigned(true);
+      // Deposit collection (issue #162): if a deposit was configured and a
+      // Checkout Session was successfully prepared, offer the payment link
+      // right away. If it's null (no deposit configured, or the org has no
+      // connected Stripe account yet -- see
+      // lib/payments/createDepositCheckoutSession.ts), the page simply
+      // shows the plain "thank you" confirmation below, same as before this
+      // feature existed.
+      setDepositCheckoutUrl(result.depositCheckoutUrl ?? null);
     });
   }
 
   if (signed) {
     return (
-      <div className="rounded-2xl bg-[#dcfce7] p-6 text-center">
+      <div className="flex flex-col gap-4 rounded-2xl bg-[#dcfce7] p-6 text-center">
         <p className="text-sm font-medium text-[#16a34a]">
           Vielen Dank! Ihre Bestätigung wurde gespeichert.
         </p>
+        {depositCheckoutUrl && (
+          <a
+            href={depositCheckoutUrl}
+            className="self-center rounded-full bg-[#2563eb] px-5 py-3 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8]"
+          >
+            Anzahlung jetzt bezahlen
+          </a>
+        )}
       </div>
     );
   }
