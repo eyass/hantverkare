@@ -23,6 +23,14 @@ export type ReportsCopy = {
   profitabilityCost: string;
   profitabilityMargin: string;
   profitabilityIncomplete: (withCost: number, total: number) => string;
+  declinedTitle: string;
+  declinedEmpty: string;
+  declinedSummary: (count: number, totalLost: string) => string;
+  declinedColDate: string;
+  declinedColCustomer: string;
+  declinedColReason: string;
+  declinedColValue: string;
+  declinedNoReason: string;
 };
 
 export const REPORTS_DICTIONARY: Dictionary<ReportsCopy> = {
@@ -51,6 +59,15 @@ export const REPORTS_DICTIONARY: Dictionary<ReportsCopy> = {
     profitabilityMargin: "Rohertrag",
     profitabilityIncomplete: (withCost, total) =>
       `Hinweis: Nicht für alle Positionen sind Kosten hinterlegt (${withCost} von ${total}). Die Marge oben bezieht sich nur auf Positionen mit erfassten Kosten.`,
+    declinedTitle: "Abgelehnte Angebote",
+    declinedEmpty: "– Im aktuellen Zeitraum wurden keine Angebote abgelehnt.",
+    declinedSummary: (count, totalLost) =>
+      `${count} abgelehnte${count === 1 ? "s" : ""} Angebot${count === 1 ? "" : "e"} · ${totalLost} entgangener Wert`,
+    declinedColDate: "Datum",
+    declinedColCustomer: "Angebot",
+    declinedColReason: "Grund",
+    declinedColValue: "Wert",
+    declinedNoReason: "– kein Grund angegeben –",
   },
   en: {
     title: "Reports",
@@ -77,5 +94,14 @@ export const REPORTS_DICTIONARY: Dictionary<ReportsCopy> = {
     profitabilityMargin: "Gross margin",
     profitabilityIncomplete: (withCost, total) =>
       `Note: not all line items have cost data (${withCost} of ${total}). The margin above only reflects items with recorded costs.`,
+    declinedTitle: "Declined quotes",
+    declinedEmpty: "– No quotes were declined in the current range.",
+    declinedSummary: (count, totalLost) =>
+      `${count} declined quote${count === 1 ? "" : "s"} · ${totalLost} in lost value`,
+    declinedColDate: "Date",
+    declinedColCustomer: "Quote",
+    declinedColReason: "Reason",
+    declinedColValue: "Value",
+    declinedNoReason: "– no reason given –",
   },
 };

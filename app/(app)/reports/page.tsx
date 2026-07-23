@@ -8,6 +8,7 @@ import {
   type ReportsRangePreset,
 } from "@/lib/reports/dateRange";
 import { REPORTS_DICTIONARY } from "./reports.dictionary";
+import { summarizeDeclinedQuotes, type DeclinedQuoteRow } from "@/lib/reports/declinedQuotes";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -85,6 +86,22 @@ export default async function ReportsPage({
       })),
     );
   }
+
+  // Declined quotes are queried by declined_at (rather than created_at, used
+  // above) so the section reflects declines that happened within the
+  // selected range, regardless of when the quote was originally created.
+  const { data: declinedQuotes, error: declinedError } = await supabase
+    .from("quotes")
+    .select("id, customer_description, decline_reason, declined_at, total_cents")
+    .not("declined_at", "is", null)
+    .gte("declined_at", dateRange.startISO)
+    .lt("declined_at", dateRange.endISO)
+    .order("declined_at", { ascending: false });
+  if (declinedError) {
+    console.error("Failed to load declined quotes for reports:", declinedError);
+  }
+  const declinedRows = (declinedQuotes ?? []) as DeclinedQuoteRow[];
+  const declinedSummary = summarizeDeclinedQuotes(declinedRows);
 
   const tiles: { label: string; value: string }[] = [
     { label: t.tileTotalQuotes, value: String(totalQuotes) },
@@ -216,6 +233,49 @@ export default async function ReportsPage({
                 )}
               </p>
             )}
+          </>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-medium text-[#0f172a]">{t.declinedTitle}</h2>
+        {declinedRows.length === 0 ? (
+          <div className="rounded-2xl border border-[#e9edf2] bg-white p-4 text-sm text-[#64748b]">
+            {t.declinedEmpty}
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-[#64748b]">
+              {t.declinedSummary(declinedSummary.count, formatEuros(declinedSummary.totalLostCents))}
+            </p>
+            <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#e9edf2] text-[#64748b]">
+                    <th className="px-4 py-3 font-medium">{t.declinedColDate}</th>
+                    <th className="px-4 py-3 font-medium">{t.declinedColCustomer}</th>
+                    <th className="px-4 py-3 font-medium">{t.declinedColReason}</th>
+                    <th className="px-4 py-3 text-right font-medium">{t.declinedColValue}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {declinedRows.map((quote) => (
+                    <tr key={quote.id} className="border-b border-[#e9edf2] last:border-0">
+                      <td className="px-4 py-3 whitespace-nowrap text-[#64748b]">
+                        {new Date(quote.declined_at).toLocaleDateString("de-DE")}
+                      </td>
+                      <td className="px-4 py-3 text-[#0f172a]">{quote.customer_description}</td>
+                      <td className="px-4 py-3 text-[#64748b]">
+                        {quote.decline_reason || t.declinedNoReason}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-[#0f172a]">
+                        {formatEuros(quote.total_cents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
