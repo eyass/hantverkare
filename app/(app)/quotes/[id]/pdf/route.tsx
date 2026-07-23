@@ -1,8 +1,11 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
-import { QuotePdfDocument, type PdfLineItem } from "../QuotePdfDocument";
+import { QuotePdfDocument, type PdfLineItem, type PdfPhoto } from "../QuotePdfDocument";
+import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 
 export const runtime = "nodejs";
+
+const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a PDF render
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -40,6 +43,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     console.error("Failed to load business settings for quote PDF", id, businessSettingsError);
   }
 
+  // Customer-visible photo-per-line-item (issue #208) -- only photos tagged
+  // to a line item are needed here; general job photos aren't rendered in
+  // the PDF today and this doesn't add that.
+  const { data: photoRows, error: photoRowsError } = await supabase
+    .from("quote_photos")
+    .select("id, storage_path, quote_line_item_id")
+    .eq("quote_id", id)
+    .not("quote_line_item_id", "is", null);
+  if (photoRowsError) {
+    console.error("Failed to load photos for quote PDF", id, photoRowsError);
+  }
+  const photos: PdfPhoto[] = await Promise.all(
+    (photoRows ?? []).map(async (photo) => {
+      const { data: signed } = await supabase.storage
+        .from(QUOTE_PHOTOS_BUCKET)
+        .createSignedUrl(photo.storage_path, PHOTO_SIGNED_URL_TTL_SECONDS);
+      return { id: photo.id, url: signed?.signedUrl ?? null, quote_line_item_id: photo.quote_line_item_id };
+    }),
+  );
+
   let buffer: Buffer;
   try {
     buffer = await renderToBuffer(
@@ -47,6 +70,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         quote={quote}
         lineItems={(lineItems ?? []) as PdfLineItem[]}
         businessSettings={businessSettings ?? null}
+        photos={photos}
       />,
     );
   } catch (err) {
