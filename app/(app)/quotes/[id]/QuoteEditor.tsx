@@ -31,6 +31,7 @@ type LineItem = {
   price_list_item_id?: string | null;
   item_type?: "labor" | "material" | null;
   quantity_reasoning?: string | null;
+  confidence?: "high" | "medium" | "low" | null;
 };
 
 type Quote = {
@@ -361,6 +362,23 @@ export function QuoteEditor({
                           }`}
                         >
                           {item.item_type === "labor" ? "Arbeit" : "Material"}
+                        </span>
+                      )}
+                      {(item.confidence === "low" || item.confidence === "medium") && (
+                        <span
+                          className="flex shrink-0 items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]"
+                          title={
+                            item.confidence === "low"
+                              ? "Niedrige Sicherheit -- bitte vor dem Versenden prüfen."
+                              : "Mittlere Sicherheit -- bitte kurz prüfen."
+                          }
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              item.confidence === "low" ? "bg-amber-500" : "bg-amber-300"
+                            }`}
+                          />
+                          {item.confidence === "low" ? "Niedrig" : "Mittel"}
                         </span>
                       )}
                       <input

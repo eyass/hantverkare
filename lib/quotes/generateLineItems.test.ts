@@ -9,8 +9,8 @@ import {
 } from "./generateLineItems";
 
 // Mock the Anthropic client entirely -- these tests exercise deterministic
-// prompt-construction and schema-parsing logic (issue #193/#200), never a
-// real LLM call. Each test controls exactly what "the model" returns via
+// prompt-construction and schema-parsing logic (issue #193/#200/#202), never
+// a real LLM call. Each test controls exactly what "the model" returns via
 // the mocked tool_use response.
 const mockCreate = vi.fn();
 vi.mock("@anthropic-ai/sdk", () => ({
@@ -33,6 +33,7 @@ describe("parseLineItemsToolInput", () => {
           quantity: 12,
           itemType: "labor",
           quantityReasoning: "12 m² laut Beschreibung.",
+          confidence: "high",
           priceListItemId: "pli-1",
         },
       ],
@@ -46,6 +47,7 @@ describe("parseLineItemsToolInput", () => {
         unitPriceCents: 4500,
         itemType: "labor",
         quantityReasoning: "12 m² laut Beschreibung.",
+        confidence: "high",
         priceListItemId: "pli-1",
       },
     ]);
@@ -62,7 +64,7 @@ describe("parseLineItemsToolInput", () => {
   it("throws when quantity is zero or negative", () => {
     const input = {
       lineItems: [
-        { quantity: 0, itemType: "labor", quantityReasoning: "x", priceListItemId: "pli-1" },
+        { quantity: 0, itemType: "labor", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
       ],
     };
     expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
@@ -71,12 +73,12 @@ describe("parseLineItemsToolInput", () => {
   it("throws when quantity is NaN or Infinity", () => {
     const nanInput = {
       lineItems: [
-        { quantity: NaN, itemType: "labor", quantityReasoning: "x", priceListItemId: "pli-1" },
+        { quantity: NaN, itemType: "labor", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
       ],
     };
     const infInput = {
       lineItems: [
-        { quantity: Infinity, itemType: "labor", quantityReasoning: "x", priceListItemId: "pli-1" },
+        { quantity: Infinity, itemType: "labor", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
       ],
     };
     expect(() => parseLineItemsToolInput(nanInput, priceList)).toThrow(QuoteGenerationError);
@@ -85,11 +87,11 @@ describe("parseLineItemsToolInput", () => {
 
   it("throws when itemType is missing or invalid", () => {
     const missing = {
-      lineItems: [{ quantity: 1, quantityReasoning: "x", priceListItemId: "pli-1" }],
+      lineItems: [{ quantity: 1, quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" }],
     };
     const invalid = {
       lineItems: [
-        { quantity: 1, itemType: "not_a_type", quantityReasoning: "x", priceListItemId: "pli-1" },
+        { quantity: 1, itemType: "not_a_type", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
       ],
     };
     expect(() => parseLineItemsToolInput(missing, priceList)).toThrow(QuoteGenerationError);
@@ -98,7 +100,7 @@ describe("parseLineItemsToolInput", () => {
 
   it("throws when quantityReasoning is missing (forced reasoning is required)", () => {
     const input = {
-      lineItems: [{ quantity: 1, itemType: "labor", priceListItemId: "pli-1" }],
+      lineItems: [{ quantity: 1, itemType: "labor", confidence: "high", priceListItemId: "pli-1" }],
     };
     expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
   });
@@ -106,7 +108,7 @@ describe("parseLineItemsToolInput", () => {
   it("throws when quantityReasoning is an empty/blank string", () => {
     const input = {
       lineItems: [
-        { quantity: 1, itemType: "labor", quantityReasoning: "   ", priceListItemId: "pli-1" },
+        { quantity: 1, itemType: "labor", quantityReasoning: "   ", confidence: "high", priceListItemId: "pli-1" },
       ],
     };
     expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
@@ -114,7 +116,7 @@ describe("parseLineItemsToolInput", () => {
 
   it("throws when neither priceListItemId nor a custom item is provided", () => {
     const input = {
-      lineItems: [{ quantity: 1, itemType: "labor", quantityReasoning: "x" }],
+      lineItems: [{ quantity: 1, itemType: "labor", quantityReasoning: "x", confidence: "high" }],
     };
     expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
   });
@@ -126,6 +128,7 @@ describe("parseLineItemsToolInput", () => {
           quantity: 1,
           itemType: "labor",
           quantityReasoning: "x",
+          confidence: "high",
           priceListItemId: "pli-1",
           customUnitPriceCents: 1000,
           customDescription: "Custom",
@@ -133,6 +136,49 @@ describe("parseLineItemsToolInput", () => {
       ],
     };
     expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
+  });
+});
+
+describe("parseLineItemsToolInput confidence (issue #202)", () => {
+  it("throws when confidence is missing", () => {
+    const input = {
+      lineItems: [{ quantity: 1, itemType: "labor", quantityReasoning: "x", priceListItemId: "pli-1" }],
+    };
+    expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
+  });
+
+  it("throws when confidence is an invalid value", () => {
+    const input = {
+      lineItems: [
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          confidence: "very_sure",
+          priceListItemId: "pli-1",
+        },
+      ],
+    };
+    expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
+  });
+
+  it("throws when confidence is not a string", () => {
+    const input = {
+      lineItems: [
+        { quantity: 1, itemType: "labor", quantityReasoning: "x", confidence: 1, priceListItemId: "pli-1" },
+      ],
+    };
+    expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
+  });
+
+  it.each(["high", "medium", "low"] as const)("accepts confidence '%s'", (confidence) => {
+    const input = {
+      lineItems: [
+        { quantity: 1, itemType: "labor", quantityReasoning: "x", confidence, priceListItemId: "pli-1" },
+      ],
+    };
+    const result = parseLineItemsToolInput(input, priceList);
+    expect(result[0].confidence).toBe(confidence);
   });
 });
 
@@ -148,6 +194,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
           quantity: 5,
           itemType: "material",
           quantityReasoning: "5 m² laut Aufmaß.",
+          confidence: "medium",
           priceListItemId: "pli-2",
           // Not part of the schema for a priceListItemId item, but even if
           // present should never be trusted:
@@ -166,6 +213,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
         unitPriceCents: 1500,
         itemType: "material",
         quantityReasoning: "5 m² laut Aufmaß.",
+        confidence: "medium",
         priceListItemId: "pli-2",
       },
     ]);
@@ -178,6 +226,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
           quantity: 2,
           itemType: "material",
           quantityReasoning: "2 Stück laut Beschreibung.",
+          confidence: "low",
           customUnitPriceCents: 12345,
           customDescription: "Spezialdichtung",
           unit: "Stück",
@@ -193,6 +242,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
         unitPriceCents: 12345,
         itemType: "material",
         quantityReasoning: "2 Stück laut Beschreibung.",
+        confidence: "low",
         priceListItemId: null,
       },
     ]);
@@ -205,6 +255,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
           quantity: 1,
           itemType: "labor",
           quantityReasoning: "x",
+          confidence: "high",
           priceListItemId: "does-not-exist",
         },
       ],
@@ -215,7 +266,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
 
 describe("parseGenerateLineItemsToolInput risk flags (issue #193)", () => {
   const baseLineItems = [
-    { quantity: 1, itemType: "labor", quantityReasoning: "x", priceListItemId: "pli-1" },
+    { quantity: 1, itemType: "labor", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
   ];
 
   it("returns an empty riskFlags array when the field is absent", () => {
@@ -258,7 +309,7 @@ describe("parseGenerateLineItemsToolInput risk flags (issue #193)", () => {
 
 describe("parseGenerateLineItemsToolInput clarifying questions (issue #194)", () => {
   const baseLineItems = [
-    { quantity: 1, itemType: "labor", quantityReasoning: "x", priceListItemId: "pli-1" },
+    { quantity: 1, itemType: "labor", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
   ];
 
   it("returns an empty clarifyingQuestions array when the field is absent", () => {
@@ -343,6 +394,35 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("Prefer producing a complete draft with reasonable assumptions");
     expect(prompt).toContain("at most 3");
   });
+
+  it("always includes the auxiliary-cost instruction block (issue #202)", () => {
+    const prompt = buildPrompt("Irgendein Auftrag", priceList);
+    expect(prompt).toContain("Anfahrt");
+    expect(prompt).toContain("Entsorgung");
+    expect(prompt).toContain("Kleinmaterial");
+  });
+
+  it("instructs the model to set a confidence per line item (issue #202)", () => {
+    const prompt = buildPrompt("Irgendein Auftrag", priceList);
+    expect(prompt).toContain("confidence");
+  });
+
+  it("omits any few-shot history section when pastQuotesContext is not provided", () => {
+    const prompt = buildPrompt("Irgendein Auftrag", priceList);
+    expect(prompt).not.toContain("recent examples of how this organization has priced");
+  });
+
+  it("omits any few-shot history section when pastQuotesContext is undefined explicitly", () => {
+    const prompt = buildPrompt("Irgendein Auftrag", priceList, undefined);
+    expect(prompt).not.toContain("recent examples of how this organization has priced");
+  });
+
+  it("includes the few-shot history block and its content when pastQuotesContext is provided (issue #202)", () => {
+    const history = 'Beispiel 1 (Auftrag: "Badezimmer fliesen"):\n  - Fliesen verlegen: 10 m² à 45.00 EUR';
+    const prompt = buildPrompt("Irgendein Auftrag", priceList, history);
+    expect(prompt).toContain("recent examples of how this organization has priced");
+    expect(prompt).toContain(history);
+  });
 });
 
 describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)", () => {
@@ -363,6 +443,7 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
           quantity: 20,
           itemType: "labor",
           quantityReasoning: "20 m² laut Beschreibung.",
+          confidence: "high",
           priceListItemId: "pli-2",
         },
       ],
@@ -393,6 +474,7 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
           quantity: 80,
           itemType: "labor",
           quantityReasoning: "80 m² laut Beschreibung.",
+          confidence: "high",
           priceListItemId: "pli-3",
         },
       ],
@@ -421,6 +503,7 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
           quantity: 12,
           itemType: "labor",
           quantityReasoning: "12 m² laut Beschreibung.",
+          confidence: "high",
           priceListItemId: "pli-1",
         },
       ],
@@ -442,6 +525,7 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
           quantity: 10,
           itemType: "labor",
           quantityReasoning: "10 m² geschätzt, Fläche unklar.",
+          confidence: "medium",
           priceListItemId: "pli-2",
         },
       ],
@@ -465,6 +549,7 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
           quantity: 1,
           itemType: "labor",
           quantityReasoning: "x",
+          confidence: "high",
           priceListItemId: "hallucinated-id",
         },
       ],
@@ -473,5 +558,43 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
     await expect(
       generateLineItems("Irgendein Auftrag", priceList),
     ).rejects.toThrow(QuoteGenerationError);
+  });
+
+  it("throws QuoteGenerationError when the AI omits confidence on a line item (issue #202)", async () => {
+    mockToolResponse({
+      lineItems: [
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          priceListItemId: "pli-1",
+        },
+      ],
+    });
+
+    await expect(
+      generateLineItems("Irgendein Auftrag", priceList),
+    ).rejects.toThrow(QuoteGenerationError);
+  });
+
+  it("passes pastQuotesContext through into the constructed prompt sent to the model (issue #202)", async () => {
+    mockToolResponse({
+      lineItems: [
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          confidence: "high",
+          priceListItemId: "pli-1",
+        },
+      ],
+    });
+
+    const history = 'Beispiel 1 (Auftrag: "Badezimmer fliesen"):\n  - Fliesen verlegen: 10 m² à 45.00 EUR';
+    await generateLineItems("Irgendein Auftrag", priceList, history);
+
+    const callArgs = mockCreate.mock.calls[0][0];
+    const promptSent = callArgs.messages[0].content as string;
+    expect(promptSent).toContain(history);
   });
 });

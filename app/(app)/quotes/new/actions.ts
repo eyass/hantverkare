@@ -8,6 +8,7 @@ import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { buildLineItemsFromTemplate } from "@/lib/quoteTemplates/templateBuilder";
 import { matchPriceListItemId } from "@/lib/inventory/matchPriceListItem";
 import type { GeneratedLineItem } from "@/lib/quotes/generateLineItems";
+import { buildPastQuotesContext, MAX_PAST_QUOTES } from "@/lib/quotes/pastQuotesContext";
 
 export type GenerateQuoteState = { error: string | null; queuedOffline?: boolean };
 
@@ -53,6 +54,26 @@ export async function generateQuoteDraft(
     return { error: "Bitte lege zuerst Preislistenpositionen an." };
   }
 
+  // Few-shot calibration (issue #202): pull this org's most recent finalized
+  // quotes (simple recency query, no embeddings/semantic search -- out of
+  // scope for v1) so the model calibrates toward this org's own typical
+  // quantities/wording/margins instead of guessing cold every time. Degrades
+  // gracefully to no examples when the org has fewer than 2-3 final quotes
+  // yet -- today's cold-start behavior, not an error.
+  const { data: pastQuotes, error: pastQuotesError } = await supabase
+    .from("quotes")
+    .select("customer_description, quote_line_items(description, quantity, unit, unit_price_cents)")
+    .eq("organization_id", org.organizationId)
+    .eq("status", "final")
+    .order("created_at", { ascending: false })
+    .limit(MAX_PAST_QUOTES);
+  if (pastQuotesError) {
+    // Non-critical -- the few-shot block is a calibration aid, not required
+    // for a valid draft, so just proceed without it.
+    console.error("Failed to load past quotes for few-shot context:", pastQuotesError);
+  }
+  const pastQuotesContext = buildPastQuotesContext(pastQuotes);
+
   let generated;
   try {
     generated = await generateLineItems(
@@ -64,6 +85,7 @@ export async function generateQuoteDraft(
         unitPriceCents: p.unit_price_cents,
         category: p.category,
       })),
+      pastQuotesContext,
     );
   } catch (err) {
     if (err instanceof QuoteGenerationError) {
@@ -77,6 +99,7 @@ export async function generateQuoteDraft(
     ...priceLineItem(item),
     itemType: item.itemType,
     quantityReasoning: item.quantityReasoning,
+    confidence: item.confidence,
     priceListItemId: item.priceListItemId,
   }));
   const totals = computeTotals(pricedItems);
@@ -130,6 +153,7 @@ export async function generateQuoteDraft(
       price_list_item_id: item.priceListItemId,
       item_type: item.itemType,
       quantity_reasoning: item.quantityReasoning,
+      confidence: item.confidence,
     })),
   );
   if (lineItemsError) {

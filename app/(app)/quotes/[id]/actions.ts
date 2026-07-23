@@ -15,6 +15,7 @@ import {
   type GeneratedLineItem,
 } from "@/lib/quotes/generateLineItems";
 import { buildClarifyingQuestionsUpdate, buildResolvedTimestamp } from "@/lib/quotes/clarifyingQuestions";
+import { buildPastQuotesContext, MAX_PAST_QUOTES } from "@/lib/quotes/pastQuotesContext";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 import { computeNextDueDate, isValidContractInterval, type ContractInterval } from "@/lib/contracts/interval";
 import {
@@ -649,6 +650,21 @@ export async function regenerateQuoteDraft(
 
   const nextDescription = `${quote.customer_description}\n\n${trimmed}`;
 
+  // Few-shot calibration (issue #202) -- same recency query as
+  // generateQuoteDraft in app/(app)/quotes/new/actions.ts; see
+  // lib/quotes/pastQuotesContext.ts for the shared formatting/scoping logic.
+  const { data: pastQuotes, error: pastQuotesError } = await supabase
+    .from("quotes")
+    .select("customer_description, quote_line_items(description, quantity, unit, unit_price_cents)")
+    .eq("organization_id", org.organizationId)
+    .eq("status", "final")
+    .order("created_at", { ascending: false })
+    .limit(MAX_PAST_QUOTES);
+  if (pastQuotesError) {
+    console.error("Failed to load past quotes for few-shot context:", pastQuotesError);
+  }
+  const pastQuotesContext = buildPastQuotesContext(pastQuotes);
+
   let generated;
   try {
     generated = await generateLineItems(
@@ -660,6 +676,7 @@ export async function regenerateQuoteDraft(
         unitPriceCents: p.unit_price_cents,
         category: p.category,
       })),
+      pastQuotesContext,
     );
   } catch (err) {
     if (err instanceof QuoteGenerationError) {
@@ -673,6 +690,7 @@ export async function regenerateQuoteDraft(
     ...priceLineItem(item),
     itemType: item.itemType,
     quantityReasoning: item.quantityReasoning,
+    confidence: item.confidence,
     priceListItemId: item.priceListItemId,
   }));
   const totals = computeTotals(pricedItems);
@@ -732,10 +750,11 @@ export async function regenerateQuoteDraft(
         price_list_item_id: item.priceListItemId,
         item_type: item.itemType,
         quantity_reasoning: item.quantityReasoning,
+        confidence: item.confidence,
       })),
     )
     .select(
-      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning",
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, confidence",
     );
   if (insertError || !insertedItems) {
     console.error("Failed to insert regenerated line items:", insertError);

@@ -29,6 +29,14 @@ const MAX_CLARIFYING_QUESTIONS = 3;
 export const ITEM_TYPES = ["labor", "material"] as const;
 export type ItemType = (typeof ITEM_TYPES)[number];
 
+// Per-line-item confidence (issue #202) -- lets the tradesperson quickly
+// spot which lines the model is least sure about, instead of every line
+// carrying equal implicit trust. Required in the tool schema (same
+// "force the model to show its work" pattern as quantityReasoning/itemType)
+// so a draft can never silently omit it.
+export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
+export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
+
 // A resolved line item, ready to be priced/inserted (issue #200). Either
 // resolved from a real price_list_items row (priceListItemId set, and
 // description/unit/unitPriceCents come from the server's own price list --
@@ -38,6 +46,7 @@ export type ItemType = (typeof ITEM_TYPES)[number];
 export type GeneratedLineItem = LineItem & {
   itemType: ItemType;
   quantityReasoning: string;
+  confidence: ConfidenceLevel;
   priceListItemId: string | null;
 };
 
@@ -73,6 +82,15 @@ const LINE_ITEMS_TOOL = {
                 "A short justification (in German, matching the app's existing German-language line item style) " +
                 "for how this quantity was derived, e.g. '6m² Boden / 1,5m² pro Paket = 4 Pakete, aufgerundet'.",
             },
+            confidence: {
+              type: "string" as const,
+              enum: [...CONFIDENCE_LEVELS],
+              description:
+                "How confident you are in this specific line item's quantity/price given the job description -- " +
+                "'high' when the description gives clear, unambiguous grounds for it, 'medium' when it's a " +
+                "reasonable estimate with some assumption baked in, 'low' when it's a rough guess the tradesperson " +
+                "should double-check before sending.",
+            },
             priceListItemId: {
               type: "string" as const,
               description:
@@ -94,7 +112,7 @@ const LINE_ITEMS_TOOL = {
                 "Only required alongside a custom item (priceListItemId omitted) -- the unit of measure, e.g. 'Stunde', 'm²', 'Stück'.",
             },
           },
-          required: ["quantity", "itemType", "quantityReasoning"],
+          required: ["quantity", "itemType", "quantityReasoning", "confidence"],
         },
       },
       riskFlags: {
@@ -220,6 +238,14 @@ function resolveLineItem(
     throw new QuoteGenerationError(`Missing quantityReasoning at index ${index}`);
   }
 
+  if (
+    typeof item.confidence !== "string" ||
+    !(CONFIDENCE_LEVELS as readonly string[]).includes(item.confidence)
+  ) {
+    throw new QuoteGenerationError(`Missing or invalid confidence at index ${index}`);
+  }
+  const confidence = item.confidence as ConfidenceLevel;
+
   const hasPriceListItemId = typeof item.priceListItemId === "string" && item.priceListItemId.length > 0;
   const hasCustom =
     typeof item.customUnitPriceCents === "number" && typeof item.customDescription === "string";
@@ -246,6 +272,7 @@ function resolveLineItem(
       unitPriceCents: priceListItem.unitPriceCents,
       itemType: item.itemType as ItemType,
       quantityReasoning: (item.quantityReasoning as string).trim(),
+      confidence,
       priceListItemId: priceListItem.id,
     };
   }
@@ -275,6 +302,7 @@ function resolveLineItem(
     unitPriceCents: customUnitPriceCents,
     itemType: item.itemType as ItemType,
     quantityReasoning: (item.quantityReasoning as string).trim(),
+    confidence,
     priceListItemId: null,
   };
 }
@@ -323,7 +351,26 @@ const RISK_FLAG_INSTRUCTIONS = `Additionally, review the job description for the
 
 Only flag a category when the description gives a clear, specific signal -- do not flag speculatively. For each flag, write a short German-language "message" explaining what to check and with whom (Hausverwaltung, Denkmalschutzbehörde, etc.).`;
 
-export function buildPrompt(description: string, priceList: PriceListItem[]): string {
+// Standard German Handwerker auxiliary costs (issue #202) -- these are
+// routinely forgotten by both AI drafts and by tradespeople in a hurry, so
+// make evaluating them a habitual step rather than something the model only
+// stumbles onto. Deliberately NOT mandatory -- e.g. Entsorgung only applies
+// when old material is actually being removed -- the instruction just makes
+// sure the model always *checks*, the same "habitual, not forced" framing
+// as RISK_FLAG_INSTRUCTIONS above.
+const AUXILIARY_COST_INSTRUCTIONS = `Additionally, always evaluate whether these standard German Handwerker auxiliary costs plausibly apply to this job, and include a line item for each one that does (skip any that clearly don't apply -- do not force all three onto every quote):
+
+1. Anfahrt / Anfahrtspauschale (travel to the job site) -- almost always applicable unless the description says otherwise.
+2. Entsorgung (disposal of old materials/debris) -- only when the job involves removing/demolishing existing material.
+3. Kleinmaterial (small consumables not worth itemizing individually, e.g. Schrauben, Klebstoff, Klebeband) -- when the job involves this kind of incidental material use.
+
+For each one that applies, prefer matching it to a real price list entry (this Handwerker's price list may already contain an "Anfahrt"-style entry -- check the price list below the same way as any other line item) before falling back to a custom item with a clearly-reasoned estimate in quantityReasoning.`;
+
+export function buildPrompt(
+  description: string,
+  priceList: PriceListItem[],
+  pastQuotesContext?: string,
+): string {
   const priceListText = priceList
     .map(
       (p) =>
@@ -331,26 +378,42 @@ export function buildPrompt(description: string, priceList: PriceListItem[]): st
     )
     .join("\n");
 
+  // Few-shot calibration from the organization's own quoting history (issue
+  // #202) -- optional and omitted entirely when the org doesn't have enough
+  // finalized quotes yet (cold start), so this degrades gracefully to
+  // today's behavior rather than erroring or padding the prompt with
+  // nothing useful.
+  const historyBlock = pastQuotesContext
+    ? `Here are recent examples of how this organization has priced similar work -- use them to calibrate your quantities, wording, and margins toward this organization's own typical style rather than guessing cold:
+
+${pastQuotesContext}
+
+`
+    : "";
+
   return `You are pricing a job for a German Handwerker (tradesperson) using their price list below. Given the job description, produce a list of line items with realistic quantities. All prices are in EUR cents.
 
 For each line item, strongly prefer selecting an existing price list item by its id whenever the job description matches one -- even approximately (e.g. a "Fliesen verlegen" job should use the exact "Fliesenleger, Fliesen verlegen" catalog entry by id if present, not invent a new price for it). Only propose a custom item (with your own customUnitPriceCents, customDescription, and unit) when nothing in the price list reasonably fits. Never invent a price for something that's already in the price list -- always reference it by id instead so the exact catalog price is used.
 
-For every line item, classify it as itemType "labor" (work performed) or "material" (goods/parts used), and provide a short quantityReasoning in German (matching this app's existing German-language line item style) briefly explaining how you derived the quantity, e.g. "6m² Boden / 1,5m² pro Paket = 4 Pakete, aufgerundet".
+For every line item, classify it as itemType "labor" (work performed) or "material" (goods/parts used), provide a short quantityReasoning in German (matching this app's existing German-language line item style) briefly explaining how you derived the quantity, e.g. "6m² Boden / 1,5m² pro Paket = 4 Pakete, aufgerundet", and set a confidence of "high", "medium", or "low" for how sure you are about that specific line item.
 
 Prefer producing a complete draft with reasonable assumptions whenever you can -- the tradesperson reviews and edits every draft before sending it, so a confident best guess is far more useful than a stalled draft. Only include clarifyingQuestions (at most 3) when a detail is genuinely blocking -- you cannot produce any reasonable estimate without it (e.g. "Wie viele Quadratmeter hat das Badezimmer?" when materials can't be quantified at all without an area). Do NOT ask about stylistic preferences, exact brand/color choices, or anything you can safely default -- still produce the full lineItems draft even when you do ask a question.
 
-Price list:
+${historyBlock}Price list:
 ${priceListText}
 
 Job description:
 ${description}
 
-${RISK_FLAG_INSTRUCTIONS}`;
+${RISK_FLAG_INSTRUCTIONS}
+
+${AUXILIARY_COST_INSTRUCTIONS}`;
 }
 
 export async function generateLineItems(
   description: string,
   priceList: PriceListItem[],
+  pastQuotesContext?: string,
 ): Promise<GenerateLineItemsResult> {
   const anthropic = new Anthropic();
 
@@ -361,7 +424,7 @@ export async function generateLineItems(
       max_tokens: 2048,
       tools: [LINE_ITEMS_TOOL],
       tool_choice: { type: "tool", name: "submit_line_items" },
-      messages: [{ role: "user", content: buildPrompt(description, priceList) }],
+      messages: [{ role: "user", content: buildPrompt(description, priceList, pastQuotesContext) }],
     });
   } catch (err) {
     throw new QuoteGenerationError(`Anthropic API call failed: ${(err as Error).message}`, {
