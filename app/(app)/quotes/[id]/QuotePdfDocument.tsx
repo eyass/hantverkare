@@ -1,6 +1,7 @@
 import { Fragment } from "react";
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { groupLineItems } from "@/lib/quotes/groupLineItems";
+import { groupPhotosByLineItem, photosForLineItem } from "@/lib/quotes/photosByLineItem";
 
 export type PdfLineItem = {
   id: string;
@@ -11,6 +12,12 @@ export type PdfLineItem = {
   line_total_cents: number;
   position: number;
   group_label?: string | null;
+};
+
+export type PdfPhoto = {
+  id: string;
+  url: string | null;
+  quote_line_item_id: string | null;
 };
 
 export type PdfQuote = {
@@ -87,6 +94,17 @@ const styles = StyleSheet.create({
   colUnit: { width: "12%" },
   colUnitPrice: { width: "18%", textAlign: "right" },
   colTotal: { width: "18%", textAlign: "right" },
+  lineItemPhotos: {
+    flexDirection: "row",
+    marginTop: 4,
+    gap: 4,
+  },
+  lineItemPhoto: {
+    width: 32,
+    height: 32,
+    borderRadius: 3,
+    objectFit: "cover",
+  },
   groupHeaderRow: {
     flexDirection: "row",
     backgroundColor: "#f4f4f4",
@@ -146,12 +164,19 @@ export function QuotePdfDocument({
   quote,
   lineItems,
   businessSettings,
+  photos = [],
 }: {
   quote: PdfQuote;
   lineItems: PdfLineItem[];
   businessSettings: PdfBusinessSettings;
+  photos?: PdfPhoto[];
 }) {
   const createdAt = formatDate(quote.created_at);
+
+  // Customer-visible photo-per-line-item (issue #208) -- untagged (general
+  // job) photos aren't rendered in the PDF today and this doesn't add that;
+  // only photos with a matching quote_line_item_id are linked here.
+  const photosByLineItem = groupPhotosByLineItem(photos);
 
   // Multi-room / multi-phase clustering (issue #205) -- byte-identical to
   // today's flat table when no item has a group_label; see
@@ -202,15 +227,29 @@ export function QuotePdfDocument({
                   <Text style={styles.groupHeaderText}>{group.label ?? "Weitere Positionen"}</Text>
                 </View>
               )}
-              {group.items.map((item) => (
-                <View style={styles.tableRow} key={item.id}>
-                  <Text style={styles.colDescription}>{item.description}</Text>
-                  <Text style={styles.colQuantity}>{item.quantity}</Text>
-                  <Text style={styles.colUnit}>{item.unit}</Text>
-                  <Text style={styles.colUnitPrice}>{formatEuros(item.unit_price_cents)}</Text>
-                  <Text style={styles.colTotal}>{formatEuros(item.line_total_cents)}</Text>
-                </View>
-              ))}
+              {group.items.map((item) => {
+                const itemPhotos = photosForLineItem(photosByLineItem, item.id).filter(
+                  (photo) => photo.url,
+                );
+                return (
+                  <View style={styles.tableRow} key={item.id}>
+                    <View style={styles.colDescription}>
+                      <Text>{item.description}</Text>
+                      {itemPhotos.length > 0 && (
+                        <View style={styles.lineItemPhotos}>
+                          {itemPhotos.map((photo) => (
+                            <Image key={photo.id} style={styles.lineItemPhoto} src={photo.url!} />
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.colQuantity}>{item.quantity}</Text>
+                    <Text style={styles.colUnit}>{item.unit}</Text>
+                    <Text style={styles.colUnitPrice}>{formatEuros(item.unit_price_cents)}</Text>
+                    <Text style={styles.colTotal}>{formatEuros(item.line_total_cents)}</Text>
+                  </View>
+                );
+              })}
               {grouped.hasGroups && (
                 <View style={styles.groupSubtotalRow}>
                   <Text>Zwischensumme</Text>

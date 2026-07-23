@@ -6,6 +6,10 @@ import { DeclineForm } from "./DeclineForm";
 import { CommentsThread } from "./CommentsThread";
 import { DepositPayPrompt } from "./DepositPayPrompt";
 import { groupLineItems } from "@/lib/quotes/groupLineItems";
+import { groupPhotosByLineItem, photosForLineItem } from "@/lib/quotes/photosByLineItem";
+import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
+
+const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a page view
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -22,7 +26,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select(
-      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name, declined_at, decline_reason, deposit_percent, deposit_amount_cents, deposit_paid_at",
+      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name, declined_at, decline_reason, deposit_percent, deposit_amount_cents, deposit_paid_at, viewed_at",
     )
     .eq("share_token", token)
     .single();
@@ -49,6 +53,24 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     );
   }
 
+  // Quote view tracking (issue #208) -- stamp viewed_at the first time this
+  // page is loaded for the quote, set-once/never-unset like paid_at /
+  // deposit_paid_at. Fire-and-forget: this must never slow down or block
+  // rendering the page for the customer, and a failed write here is not
+  // worth surfacing to them.
+  if (!quote.viewed_at) {
+    supabase
+      .from("quotes")
+      .update({ viewed_at: new Date().toISOString() })
+      .eq("id", quote.id)
+      .is("viewed_at", null)
+      .then(({ error: viewedAtError }) => {
+        if (viewedAtError) {
+          console.error("Failed to stamp viewed_at for quote", quote.id, viewedAtError);
+        }
+      });
+  }
+
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
     .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position, group_label")
@@ -64,6 +86,30 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     .select("id, author_type, author_name, body, created_at")
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: true });
+
+  // Customer-visible photo-per-line-item (issue #208) -- tagged photos are
+  // shown next to their line item below; untagged (general job) photos
+  // aren't rendered on this page today and this change doesn't add that.
+  const { data: photoRows } = await supabase
+    .from("quote_photos")
+    .select("id, storage_path, caption, quote_line_item_id")
+    .eq("quote_id", quote.id);
+  const taggedPhotoRows = (photoRows ?? []).filter((photo) => photo.quote_line_item_id !== null);
+  const photosByLineItem = groupPhotosByLineItem(
+    await Promise.all(
+      taggedPhotoRows.map(async (photo) => {
+        const { data: signed } = await supabase.storage
+          .from(QUOTE_PHOTOS_BUCKET)
+          .createSignedUrl(photo.storage_path, PHOTO_SIGNED_URL_TTL_SECONDS);
+        return {
+          id: photo.id,
+          url: signed?.signedUrl ?? null,
+          caption: photo.caption,
+          quote_line_item_id: photo.quote_line_item_id,
+        };
+      }),
+    ),
+  );
 
   // Multi-room / multi-phase clustering (issue #205) -- renders exactly as
   // today (flat list) when no item has a group_label; see
@@ -105,7 +151,25 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
                   )}
                   {group.items.map((item) => (
                     <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
-                      <td className="px-4 py-3 text-[#0f172a]">{item.description}</td>
+                      <td className="px-4 py-3 text-[#0f172a]">
+                        {item.description}
+                        {photosForLineItem(photosByLineItem, item.id).length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {photosForLineItem(photosByLineItem, item.id).map((photo) =>
+                              photo.url ? (
+                                <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={photo.url}
+                                    alt={photo.caption ?? "Foto zur Position"}
+                                    className="h-12 w-12 rounded-lg object-cover"
+                                  />
+                                </a>
+                              ) : null,
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-mono text-[#0f172a]">{item.quantity}</td>
                       <td className="px-4 py-3 text-[#64748b]">{item.unit}</td>
                       <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.unit_price_cents)}</td>
