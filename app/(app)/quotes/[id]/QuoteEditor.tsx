@@ -14,6 +14,7 @@ import { PhotosSection } from "./PhotosSection";
 import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
 import { CommentsSection } from "./CommentsSection";
+import { DepositSection } from "./DepositSection";
 import type { QuoteCommentRow } from "./actions";
 
 type LineItem = {
@@ -41,6 +42,9 @@ type Quote = {
   declined_at: string | null;
   decline_reason: string | null;
   assigned_to: string | null;
+  deposit_percent: number | null;
+  deposit_amount_cents: number | null;
+  deposit_paid_at: string | null;
 };
 
 type Member = {
@@ -484,6 +488,15 @@ export function QuoteEditor({
               </>
             )}
           </div>
+
+          <DepositSection
+            quoteId={quote.id}
+            status={status}
+            totalCents={totals.totalCents}
+            depositPercent={quote.deposit_percent}
+            depositAmountCents={quote.deposit_amount_cents}
+            depositPaidAt={quote.deposit_paid_at}
+          />
 
           {isDraft && (
             <button
