@@ -132,7 +132,7 @@ export default async function QuotesPage({
   };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
         <div className="flex items-center gap-2">
@@ -188,18 +188,18 @@ export default async function QuotesPage({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
-          <span className="font-mono text-2xl font-bold text-[#0f172a]">{totalCount}</span>
-          <span className="text-sm text-[#64748b]">{t.statAll}</span>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-3 sm:p-4">
+          <span className="font-mono text-xl font-bold text-[#0f172a] sm:text-2xl">{totalCount}</span>
+          <span className="text-xs text-[#64748b] sm:text-sm">{t.statAll}</span>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
-          <span className="font-mono text-2xl font-bold text-[#0f172a]">{draftCount}</span>
-          <span className="text-sm text-[#64748b]">{t.statDrafts}</span>
+        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-3 sm:p-4">
+          <span className="font-mono text-xl font-bold text-[#0f172a] sm:text-2xl">{draftCount}</span>
+          <span className="text-xs text-[#64748b] sm:text-sm">{t.statDrafts}</span>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-4">
-          <span className="font-mono text-2xl font-bold text-[#0f172a]">{finalSignedCount}</span>
-          <span className="text-sm text-[#64748b]">{t.statFinalSigned}</span>
+        <div className="flex flex-col gap-1 rounded-2xl border border-[#e9edf2] bg-white p-3 sm:p-4">
+          <span className="font-mono text-xl font-bold text-[#0f172a] sm:text-2xl">{finalSignedCount}</span>
+          <span className="text-xs text-[#64748b] sm:text-sm">{t.statFinalSigned}</span>
         </div>
       </div>
 
