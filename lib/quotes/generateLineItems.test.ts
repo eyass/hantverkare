@@ -49,6 +49,7 @@ describe("parseLineItemsToolInput", () => {
         quantityReasoning: "12 m² laut Beschreibung.",
         confidence: "high",
         priceListItemId: "pli-1",
+        groupLabel: null,
       },
     ]);
   });
@@ -182,6 +183,77 @@ describe("parseLineItemsToolInput confidence (issue #202)", () => {
   });
 });
 
+describe("parseLineItemsToolInput groupLabel (issue #205)", () => {
+  it("defaults groupLabel to null when the field is absent", () => {
+    const input = {
+      lineItems: [
+        { quantity: 1, itemType: "labor", quantityReasoning: "x", confidence: "high", priceListItemId: "pli-1" },
+      ],
+    };
+    const result = parseLineItemsToolInput(input, priceList);
+    expect(result[0].groupLabel).toBeNull();
+  });
+
+  it("accepts a valid groupLabel string", () => {
+    const input = {
+      lineItems: [
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          confidence: "high",
+          priceListItemId: "pli-1",
+          groupLabel: "Küche",
+        },
+      ],
+    };
+    const result = parseLineItemsToolInput(input, priceList);
+    expect(result[0].groupLabel).toBe("Küche");
+  });
+
+  it("trims a groupLabel and treats a blank/whitespace-only value as ungrouped", () => {
+    const input = {
+      lineItems: [
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          confidence: "high",
+          priceListItemId: "pli-1",
+          groupLabel: "  Bad  ",
+        },
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          confidence: "high",
+          priceListItemId: "pli-1",
+          groupLabel: "   ",
+        },
+      ],
+    };
+    const result = parseLineItemsToolInput(input, priceList);
+    expect(result[0].groupLabel).toBe("Bad");
+    expect(result[1].groupLabel).toBeNull();
+  });
+
+  it("throws when groupLabel is not a string", () => {
+    const input = {
+      lineItems: [
+        {
+          quantity: 1,
+          itemType: "labor",
+          quantityReasoning: "x",
+          confidence: "high",
+          priceListItemId: "pli-1",
+          groupLabel: 42,
+        },
+      ],
+    };
+    expect(() => parseLineItemsToolInput(input, priceList)).toThrow(QuoteGenerationError);
+  });
+});
+
 describe("priceListItemId trust boundary (issue #200)", () => {
   it("uses the server's own price list unit/price, ignoring any AI-echoed values for a catalog item", () => {
     // Even if the model's tool input somehow included a drifted price or
@@ -215,6 +287,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
         quantityReasoning: "5 m² laut Aufmaß.",
         confidence: "medium",
         priceListItemId: "pli-2",
+        groupLabel: null,
       },
     ]);
   });
@@ -244,6 +317,7 @@ describe("priceListItemId trust boundary (issue #200)", () => {
         quantityReasoning: "2 Stück laut Beschreibung.",
         confidence: "low",
         priceListItemId: null,
+        groupLabel: null,
       },
     ]);
   });

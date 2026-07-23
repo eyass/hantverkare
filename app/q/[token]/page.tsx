@@ -1,9 +1,11 @@
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignForm } from "./SignForm";
 import { DeclineForm } from "./DeclineForm";
 import { CommentsThread } from "./CommentsThread";
 import { DepositPayPrompt } from "./DepositPayPrompt";
+import { groupLineItems } from "@/lib/quotes/groupLineItems";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -49,7 +51,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
 
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
+    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position, group_label")
     .eq("quote_id", quote.id)
     .order("position");
   if (lineItemsError) {
@@ -62,6 +64,15 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     .select("id, author_type, author_name, body, created_at")
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: true });
+
+  // Multi-room / multi-phase clustering (issue #205) -- renders exactly as
+  // today (flat list) when no item has a group_label; see
+  // lib/quotes/groupLineItems.ts.
+  const grouped = groupLineItems(lineItems ?? [], {
+    getGroupLabel: (item) => item.group_label,
+    getLineTotalCents: (item) => item.line_total_cents,
+    getPosition: (item) => item.position,
+  });
 
   return (
     <div className="min-h-screen bg-[#0f172a] px-4 py-10 sm:px-8">
@@ -83,14 +94,35 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
               </tr>
             </thead>
             <tbody>
-              {(lineItems ?? []).map((item) => (
-                <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
-                  <td className="px-4 py-3 text-[#0f172a]">{item.description}</td>
-                  <td className="px-4 py-3 font-mono text-[#0f172a]">{item.quantity}</td>
-                  <td className="px-4 py-3 text-[#64748b]">{item.unit}</td>
-                  <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.unit_price_cents)}</td>
-                  <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.line_total_cents)}</td>
-                </tr>
+              {grouped.groups.map((group, groupIndex) => (
+                <Fragment key={group.label ?? `ungrouped-${groupIndex}`}>
+                  {grouped.hasGroups && (
+                    <tr className="bg-[#f4f6f8]">
+                      <td colSpan={5} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">
+                        {group.label ?? "Weitere Positionen"}
+                      </td>
+                    </tr>
+                  )}
+                  {group.items.map((item) => (
+                    <tr key={item.id} className="border-b border-[#e9edf2] last:border-b-0">
+                      <td className="px-4 py-3 text-[#0f172a]">{item.description}</td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a]">{item.quantity}</td>
+                      <td className="px-4 py-3 text-[#64748b]">{item.unit}</td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.unit_price_cents)}</td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a]">{formatEuros(item.line_total_cents)}</td>
+                    </tr>
+                  ))}
+                  {grouped.hasGroups && (
+                    <tr className="border-b border-[#e9edf2] last:border-b-0 bg-[#f8fafc]">
+                      <td colSpan={4} className="px-4 py-2 text-right text-xs font-medium text-[#64748b]">
+                        Zwischensumme
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs font-semibold text-[#0f172a]">
+                        {formatEuros(group.subtotalCents)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

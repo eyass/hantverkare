@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { updateLineItem, finalizeQuote, assignQuote, addSuggestedLineItem } from "./actions";
+import { groupLineItems } from "@/lib/quotes/groupLineItems";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
 import { ContractSection } from "./ContractSection";
@@ -32,6 +33,7 @@ type LineItem = {
   item_type?: "labor" | "material" | null;
   quantity_reasoning?: string | null;
   confidence?: "high" | "medium" | "low" | null;
+  group_label?: string | null;
 };
 
 type Quote = {
@@ -178,6 +180,30 @@ export function QuoteEditor({
     items.map((item) => ({ lineTotalCents: item.line_total_cents, costCents: item.cost_cents })),
   );
 
+  // Multi-room / multi-phase clustering (issue #205) -- renders exactly as
+  // today (flat list, `grouped.hasGroups === false`) when no item has a
+  // group_label; see lib/quotes/groupLineItems.ts.
+  const grouped = useMemo(
+    () =>
+      groupLineItems(items, {
+        getGroupLabel: (item) => item.group_label,
+        getLineTotalCents: (item) => item.line_total_cents,
+        getPosition: (item) => item.position,
+      }),
+    [items],
+  );
+  const existingGroupLabels = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items
+            .map((item) => item.group_label?.trim())
+            .filter((label): label is string => !!label && label.length > 0),
+        ),
+      ),
+    [items],
+  );
+
   function handleFieldChange(
     itemId: string,
     field: "description" | "quantity" | "unit_price_cents" | "cost_cents",
@@ -200,6 +226,12 @@ export function QuoteEditor({
     );
   }
 
+  function handleGroupChange(itemId: string, value: string) {
+    setItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, group_label: value } : item)),
+    );
+  }
+
   function handleBlurSave(item: LineItem) {
     startTransition(async () => {
       const result = await updateLineItem(quote.id, item.id, {
@@ -208,6 +240,7 @@ export function QuoteEditor({
         unit: item.unit,
         unitPriceCents: item.unit_price_cents,
         costCents: item.cost_cents,
+        groupLabel: item.group_label ?? null,
       });
       if (result.error !== null) {
         setError(result.error);
@@ -342,10 +375,23 @@ export function QuoteEditor({
                   Kosten (intern)
                 </th>
                 <th className="px-4 py-3 font-medium">Gesamt</th>
+                <th className="px-4 py-3 font-medium">Bereich</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
+              {grouped.groups.map((group, groupIndex) => (
+                <Fragment key={group.label ?? `ungrouped-${groupIndex}`}>
+                  {grouped.hasGroups && (
+                    <tr className="bg-[#f8fafc]">
+                      <td
+                        colSpan={7}
+                        className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]"
+                      >
+                        {group.label ?? "Weitere Positionen"}
+                      </td>
+                    </tr>
+                  )}
+                  {group.items.map((item) => {
                 const suggestion = costSuggestions[item.id];
                 const showSuggestion = suggestion !== undefined && !dismissedSuggestionIds.has(item.id);
                 return (
@@ -442,10 +488,21 @@ export function QuoteEditor({
                   <td className="font-mono px-4 py-2 font-medium text-[#0f172a]">
                     {formatEuros(item.line_total_cents)}
                   </td>
+                  <td className="px-4 py-2">
+                    <input
+                      list="quote-group-labels"
+                      value={item.group_label ?? ""}
+                      disabled={!isDraft}
+                      placeholder="z. B. Küche"
+                      onChange={(e) => handleGroupChange(item.id, e.target.value)}
+                      onBlur={() => handleBlurSave(item)}
+                      className="w-28 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-xs transition-colors focus:border-[#e9edf2] focus:bg-[#f8fafc] focus:outline-none disabled:opacity-60"
+                    />
+                  </td>
                 </tr>
                 {showSuggestion && (
                   <tr key={`${item.id}-suggestion`} className="border-b border-[#e9edf2] last:border-b-0 bg-amber-50">
-                    <td colSpan={6} className="px-4 py-2.5">
+                    <td colSpan={7} className="px-4 py-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
                         <span>
                           Ähnliche Positionen aus früheren Aufträgen kosteten im Schnitt{" "}
@@ -474,8 +531,26 @@ export function QuoteEditor({
                 </Fragment>
                 );
               })}
+                  {grouped.hasGroups && (
+                    <tr className="border-b border-[#e9edf2] last:border-b-0 bg-[#f8fafc]">
+                      <td colSpan={5} className="px-4 py-2 text-right text-xs font-medium text-[#64748b]">
+                        Zwischensumme
+                      </td>
+                      <td className="font-mono px-4 py-2 text-xs font-semibold text-[#0f172a]">
+                        {formatEuros(group.subtotalCents)}
+                      </td>
+                      <td />
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
             </tbody>
           </table>
+          <datalist id="quote-group-labels">
+            {existingGroupLabels.map((label) => (
+              <option key={label} value={label} />
+            ))}
+          </datalist>
           {isDraft && suggestions.length > 0 && (
             <div className="flex flex-col gap-3 border-t border-[#e9edf2] bg-[#f8fafc] px-4 py-4">
               <span className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
