@@ -7,6 +7,7 @@ import { generateLineItems, QuoteGenerationError } from "@/lib/quotes/generateLi
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { buildLineItemsFromTemplate } from "@/lib/quoteTemplates/templateBuilder";
 import { matchPriceListItemId } from "@/lib/inventory/matchPriceListItem";
+import type { GeneratedLineItem } from "@/lib/quotes/generateLineItems";
 
 export type GenerateQuoteState = { error: string | null; queuedOffline?: boolean };
 
@@ -57,6 +58,7 @@ export async function generateQuoteDraft(
     generated = await generateLineItems(
       description,
       priceList.map((p) => ({
+        id: p.id,
         label: p.label,
         unit: p.unit,
         unitPriceCents: p.unit_price_cents,
@@ -71,7 +73,12 @@ export async function generateQuoteDraft(
     throw err;
   }
 
-  const pricedItems = generated.lineItems.map(priceLineItem);
+  const pricedItems = generated.lineItems.map((item: GeneratedLineItem) => ({
+    ...priceLineItem(item),
+    itemType: item.itemType,
+    quantityReasoning: item.quantityReasoning,
+    priceListItemId: item.priceListItemId,
+  }));
   const totals = computeTotals(pricedItems);
 
   const { data: quote, error: quoteError } = await supabase
@@ -115,13 +122,14 @@ export async function generateQuoteDraft(
       position: index,
       organization_id: org.organizationId,
       user_id: user.id,
-      // Best-effort link back to the price list item this was priced from
-      // (see lib/inventory/matchPriceListItem.ts) -- powers stock decrement
-      // on signing. Null is expected/fine when no confident match is found.
-      price_list_item_id: matchPriceListItemId(
-        { description: item.description, unit: item.unit, unitPriceCents: item.unitPriceCents },
-        priceList,
-      ),
+      // Deterministic link back to the price list item this was priced
+      // from (issue #200) -- the AI selects a real price_list_items row by
+      // id or explicitly declares a custom item, so this is exact, never a
+      // best-effort heuristic guess. Null means the AI used a custom item
+      // (nothing in the price list fit).
+      price_list_item_id: item.priceListItemId,
+      item_type: item.itemType,
+      quantity_reasoning: item.quantityReasoning,
     })),
   );
   if (lineItemsError) {

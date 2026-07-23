@@ -4,6 +4,7 @@ import type { LineItem } from "./types";
 export class QuoteGenerationError extends Error {}
 
 export type PriceListItem = {
+  id: string;
   label: string;
   unit: string;
   unitPriceCents: number;
@@ -25,8 +26,23 @@ export type RiskFlag = {
 
 const MAX_CLARIFYING_QUESTIONS = 3;
 
+export const ITEM_TYPES = ["labor", "material"] as const;
+export type ItemType = (typeof ITEM_TYPES)[number];
+
+// A resolved line item, ready to be priced/inserted (issue #200). Either
+// resolved from a real price_list_items row (priceListItemId set, and
+// description/unit/unitPriceCents come from the server's own price list --
+// never from the AI's echo, closing the drift bug matchPriceListItemId used
+// to paper over) or a fully custom item the AI proposed when nothing in the
+// price list fit.
+export type GeneratedLineItem = LineItem & {
+  itemType: ItemType;
+  quantityReasoning: string;
+  priceListItemId: string | null;
+};
+
 export type GenerateLineItemsResult = {
-  lineItems: LineItem[];
+  lineItems: GeneratedLineItem[];
   riskFlags: RiskFlag[];
   clarifyingQuestions: string[];
 };
@@ -45,12 +61,40 @@ const LINE_ITEMS_TOOL = {
         items: {
           type: "object" as const,
           properties: {
-            description: { type: "string" as const },
             quantity: { type: "number" as const },
-            unit: { type: "string" as const },
-            unitPriceCents: { type: "integer" as const },
+            itemType: {
+              type: "string" as const,
+              enum: [...ITEM_TYPES],
+              description: "Whether this line item is labor (work performed) or material (goods/parts used).",
+            },
+            quantityReasoning: {
+              type: "string" as const,
+              description:
+                "A short justification (in German, matching the app's existing German-language line item style) " +
+                "for how this quantity was derived, e.g. '6m² Boden / 1,5m² pro Paket = 4 Pakete, aufgerundet'.",
+            },
+            priceListItemId: {
+              type: "string" as const,
+              description:
+                "The id of the matching price list item, when the job clearly matches an existing catalog entry " +
+                "(prefer this over inventing a price whenever reasonably possible). Omit entirely when using a custom item instead.",
+            },
+            customUnitPriceCents: {
+              type: "integer" as const,
+              description:
+                "Only when nothing in the price list fits: a reasonable estimated unit price in EUR cents for a custom item.",
+            },
+            customDescription: {
+              type: "string" as const,
+              description: "Only when nothing in the price list fits: a short German description of the custom item.",
+            },
+            unit: {
+              type: "string" as const,
+              description:
+                "Only required alongside a custom item (priceListItemId omitted) -- the unit of measure, e.g. 'Stunde', 'm²', 'Stück'.",
+            },
           },
-          required: ["description", "quantity", "unit", "unitPriceCents"],
+          required: ["quantity", "itemType", "quantityReasoning"],
         },
       },
       riskFlags: {
@@ -84,11 +128,14 @@ const LINE_ITEMS_TOOL = {
   },
 };
 
-export function parseLineItemsToolInput(input: unknown): LineItem[] {
-  return parseGenerateLineItemsToolInput(input).lineItems;
+export function parseLineItemsToolInput(input: unknown, priceList: PriceListItem[]): GeneratedLineItem[] {
+  return parseGenerateLineItemsToolInput(input, priceList).lineItems;
 }
 
-export function parseGenerateLineItemsToolInput(input: unknown): GenerateLineItemsResult {
+export function parseGenerateLineItemsToolInput(
+  input: unknown,
+  priceList: PriceListItem[],
+): GenerateLineItemsResult {
   if (
     typeof input !== "object" ||
     input === null ||
@@ -103,28 +150,9 @@ export function parseGenerateLineItemsToolInput(input: unknown): GenerateLineIte
     throw new QuoteGenerationError("AI returned zero line items");
   }
 
-  const lineItems = rawItems.map((raw, index) => {
-    if (
-      typeof raw !== "object" ||
-      raw === null ||
-      typeof (raw as Record<string, unknown>).description !== "string" ||
-      typeof (raw as Record<string, unknown>).quantity !== "number" ||
-      typeof (raw as Record<string, unknown>).unit !== "string" ||
-      typeof (raw as Record<string, unknown>).unitPriceCents !== "number" ||
-      !Number.isInteger((raw as Record<string, unknown>).unitPriceCents)
-    ) {
-      throw new QuoteGenerationError(`Malformed line item at index ${index}`);
-    }
+  const priceListById = new Map(priceList.map((p) => [p.id, p]));
 
-    const item = raw as LineItem;
-    if (
-      !Number.isFinite(item.quantity) || item.quantity <= 0 ||
-      !Number.isFinite(item.unitPriceCents) || item.unitPriceCents <= 0
-    ) {
-      throw new QuoteGenerationError(`Invalid quantity or price at index ${index}`);
-    }
-    return item;
-  });
+  const lineItems = rawItems.map((raw, index) => resolveLineItem(raw, index, priceListById));
 
   const riskFlags = parseRiskFlags((input as { riskFlags?: unknown }).riskFlags);
 
@@ -141,6 +169,114 @@ export function parseGenerateLineItemsToolInput(input: unknown): GenerateLineIte
   }
 
   return { lineItems, riskFlags, clarifyingQuestions };
+}
+
+/**
+ * Validates and resolves a single raw line item from the model's tool-use
+ * response into a GeneratedLineItem.
+ *
+ * Trust boundary (issue #200): when the model selects an existing catalog
+ * item via priceListItemId, the description/unit/unitPriceCents on the
+ * resulting line item come exclusively from the server's own priceList
+ * array (the same one passed into generateLineItems), never from anything
+ * the model echoed back. This is what closes the price-drift bug that used
+ * to require the fragile matchPriceListItemId() heuristic after the fact --
+ * there is no "echoed" price to drift, because we never read one for
+ * catalog items. A priceListItemId that doesn't exist in the given price
+ * list is treated as malformed input and throws, rather than silently
+ * guessing or falling back to a custom item.
+ *
+ * For a custom item (priceListItemId omitted), customUnitPriceCents and
+ * customDescription are used as-is -- same trust level as the old flat
+ * unitPriceCents/description fields, since there's no catalog row to
+ * ground-truth against.
+ */
+function resolveLineItem(
+  raw: unknown,
+  index: number,
+  priceListById: Map<string, PriceListItem>,
+): GeneratedLineItem {
+  if (typeof raw !== "object" || raw === null) {
+    throw new QuoteGenerationError(`Malformed line item at index ${index}`);
+  }
+  const item = raw as Record<string, unknown>;
+
+  if (
+    typeof item.quantity !== "number" ||
+    !Number.isFinite(item.quantity) ||
+    item.quantity <= 0
+  ) {
+    throw new QuoteGenerationError(`Invalid quantity at index ${index}`);
+  }
+
+  if (
+    typeof item.itemType !== "string" ||
+    !(ITEM_TYPES as readonly string[]).includes(item.itemType)
+  ) {
+    throw new QuoteGenerationError(`Missing or invalid itemType at index ${index}`);
+  }
+
+  if (typeof item.quantityReasoning !== "string" || item.quantityReasoning.trim().length === 0) {
+    throw new QuoteGenerationError(`Missing quantityReasoning at index ${index}`);
+  }
+
+  const hasPriceListItemId = typeof item.priceListItemId === "string" && item.priceListItemId.length > 0;
+  const hasCustom =
+    typeof item.customUnitPriceCents === "number" && typeof item.customDescription === "string";
+
+  if (hasPriceListItemId === hasCustom) {
+    // Either neither was provided, or both were -- the schema requires
+    // exactly one of the two shapes.
+    throw new QuoteGenerationError(
+      `Line item at index ${index} must specify exactly one of priceListItemId or customUnitPriceCents+customDescription`,
+    );
+  }
+
+  if (hasPriceListItemId) {
+    const priceListItem = priceListById.get(item.priceListItemId as string);
+    if (!priceListItem) {
+      throw new QuoteGenerationError(
+        `Line item at index ${index} references unknown priceListItemId "${item.priceListItemId as string}"`,
+      );
+    }
+    return {
+      description: priceListItem.label,
+      quantity: item.quantity,
+      unit: priceListItem.unit,
+      unitPriceCents: priceListItem.unitPriceCents,
+      itemType: item.itemType as ItemType,
+      quantityReasoning: (item.quantityReasoning as string).trim(),
+      priceListItemId: priceListItem.id,
+    };
+  }
+
+  const customUnitPriceCents = item.customUnitPriceCents as number;
+  const customDescription = item.customDescription as string;
+  const unit = typeof item.unit === "string" ? item.unit : "";
+
+  if (
+    !Number.isFinite(customUnitPriceCents) ||
+    !Number.isInteger(customUnitPriceCents) ||
+    customUnitPriceCents <= 0
+  ) {
+    throw new QuoteGenerationError(`Invalid customUnitPriceCents at index ${index}`);
+  }
+  if (customDescription.trim().length === 0) {
+    throw new QuoteGenerationError(`Empty customDescription at index ${index}`);
+  }
+  if (unit.trim().length === 0) {
+    throw new QuoteGenerationError(`Missing unit for custom line item at index ${index}`);
+  }
+
+  return {
+    description: customDescription,
+    quantity: item.quantity,
+    unit,
+    unitPriceCents: customUnitPriceCents,
+    itemType: item.itemType as ItemType,
+    quantityReasoning: (item.quantityReasoning as string).trim(),
+    priceListItemId: null,
+  };
 }
 
 function parseRiskFlags(raw: unknown): RiskFlag[] {
@@ -191,11 +327,15 @@ export function buildPrompt(description: string, priceList: PriceListItem[]): st
   const priceListText = priceList
     .map(
       (p) =>
-        `- ${p.label} (${p.category}): ${(p.unitPriceCents / 100).toFixed(2)} EUR / ${p.unit}`,
+        `- id=${p.id}: ${p.label} (${p.category}): ${(p.unitPriceCents / 100).toFixed(2)} EUR / ${p.unit}`,
     )
     .join("\n");
 
-  return `You are pricing a job for a German Handwerker (tradesperson) using their price list below. Given the job description, produce a list of line items with realistic quantities and unit prices drawn from the price list (or a reasonable estimate if nothing matches). All prices are in EUR cents.
+  return `You are pricing a job for a German Handwerker (tradesperson) using their price list below. Given the job description, produce a list of line items with realistic quantities. All prices are in EUR cents.
+
+For each line item, strongly prefer selecting an existing price list item by its id whenever the job description matches one -- even approximately (e.g. a "Fliesen verlegen" job should use the exact "Fliesenleger, Fliesen verlegen" catalog entry by id if present, not invent a new price for it). Only propose a custom item (with your own customUnitPriceCents, customDescription, and unit) when nothing in the price list reasonably fits. Never invent a price for something that's already in the price list -- always reference it by id instead so the exact catalog price is used.
+
+For every line item, classify it as itemType "labor" (work performed) or "material" (goods/parts used), and provide a short quantityReasoning in German (matching this app's existing German-language line item style) briefly explaining how you derived the quantity, e.g. "6m² Boden / 1,5m² pro Paket = 4 Pakete, aufgerundet".
 
 Prefer producing a complete draft with reasonable assumptions whenever you can -- the tradesperson reviews and edits every draft before sending it, so a confident best guess is far more useful than a stalled draft. Only include clarifyingQuestions (at most 3) when a detail is genuinely blocking -- you cannot produce any reasonable estimate without it (e.g. "Wie viele Quadratmeter hat das Badezimmer?" when materials can't be quantified at all without an area). Do NOT ask about stylistic preferences, exact brand/color choices, or anything you can safely default -- still produce the full lineItems draft even when you do ask a question.
 
@@ -234,5 +374,5 @@ export async function generateLineItems(
     throw new QuoteGenerationError("AI response did not include tool use");
   }
 
-  return parseGenerateLineItemsToolInput(toolUse.input);
+  return parseGenerateLineItemsToolInput(toolUse.input, priceList);
 }
