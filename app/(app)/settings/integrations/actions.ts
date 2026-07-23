@@ -1,5 +1,9 @@
 "use server";
 
+// Server Actions for the /settings/integrations page: lexoffice accounting
+// sync (issue #165) and Google Calendar sync (issue #166). Owner-only, same
+// gate/pattern as app/(app)/settings/team/actions.ts.
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -138,6 +142,77 @@ export async function setLexofficeSyncEnabled(enabled: boolean): Promise<ActionR
   if (updateError) {
     console.error("Failed to update lexoffice sync setting:", updateError);
     return { error: "Einstellung konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath("/settings/integrations");
+  return { error: null };
+}
+
+/**
+ * Disconnects the org's Google Calendar: clears the stored refresh token
+ * (revoking sync going forward) and resets the calendar-id preference back
+ * to the default. Does NOT revoke the token on Google's side -- Google lets
+ * a user manage/revoke third-party app access themselves from their Google
+ * Account settings, and there's no strong reason to force that here; simply
+ * discarding our copy of the token is sufficient to stop syncing.
+ */
+export async function disconnectGoogleCalendar(): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org || !canManageTeam(org.role)) {
+    return { error: "Nur der Inhaber kann Integrationen verwalten." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({ google_calendar_refresh_token: null, google_calendar_id: "primary" })
+    .eq("id", org.organizationId);
+
+  if (error) {
+    console.error("Failed to disconnect Google Calendar:", error);
+    return { error: "Verbindung konnte nicht getrennt werden." };
+  }
+
+  revalidatePath("/settings/integrations");
+  return { error: null };
+}
+
+/**
+ * Updates which calendar (by Google calendar id) scheduled jobs sync to.
+ * Defaults to 'primary' if left blank -- most tradespeople want jobs on
+ * their one main calendar, not a separate one they'd have to go create first.
+ */
+export async function updateGoogleCalendarId(calendarId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org || !canManageTeam(org.role)) {
+    return { error: "Nur der Inhaber kann Integrationen verwalten." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({ google_calendar_id: calendarId.trim() || "primary" })
+    .eq("id", org.organizationId);
+
+  if (error) {
+    console.error("Failed to update Google Calendar id:", error);
+    return { error: "Kalender-ID konnte nicht gespeichert werden." };
   }
 
   revalidatePath("/settings/integrations");

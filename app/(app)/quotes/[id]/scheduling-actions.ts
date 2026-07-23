@@ -12,12 +12,17 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import {
+  deleteSyncedGoogleCalendarEvent,
+  syncScheduledJobToGoogleCalendar,
+} from "@/lib/integrations/googleCalendar/sync";
 
 type ScheduledJobRow = {
   id: string;
   scheduled_start: string;
   scheduled_end: string | null;
   notes: string | null;
+  google_calendar_event_id?: string | null;
 };
 
 type ScheduleResult =
@@ -92,7 +97,7 @@ export async function scheduleJob(quoteId: string, input: ScheduleInput): Promis
 
   const { data: existing } = await supabase
     .from("scheduled_jobs")
-    .select("id")
+    .select("id, google_calendar_event_id")
     .eq("quote_id", quoteId)
     .maybeSingle();
 
@@ -108,12 +113,26 @@ export async function scheduleJob(quoteId: string, input: ScheduleInput): Promis
         updated_at: new Date().toISOString(),
       })
       .eq("id", existing.id)
-      .select("id, scheduled_start, scheduled_end, notes")
+      .select("id, scheduled_start, scheduled_end, notes, google_calendar_event_id")
       .single();
     if (updateError || !job) {
       console.error("Failed to update scheduled job:", updateError);
       return { error: "Termin konnte nicht aktualisiert werden." };
     }
+    // Best-effort (issue #166): awaited (not fire-and-forget) because
+    // serverless functions can be frozen/torn down right after the response
+    // is sent, which would silently drop an un-awaited background call. The
+    // helper itself never throws and never surfaces an error to the user --
+    // a sync failure is only logged.
+    await syncScheduledJobToGoogleCalendar({
+      id: job.id,
+      organizationId: org.organizationId,
+      quoteId,
+      scheduledStart: job.scheduled_start,
+      scheduledEnd: job.scheduled_end,
+      notes: job.notes,
+      googleCalendarEventId: job.google_calendar_event_id,
+    });
     return { error: null, job };
   }
 
@@ -127,13 +146,24 @@ export async function scheduleJob(quoteId: string, input: ScheduleInput): Promis
       scheduled_end: end ? end.toISOString() : null,
       notes,
     })
-    .select("id, scheduled_start, scheduled_end, notes")
+    .select("id, scheduled_start, scheduled_end, notes, google_calendar_event_id")
     .single();
 
   if (insertError || !job) {
     console.error("Failed to create scheduled job:", insertError);
     return { error: "Termin konnte nicht gespeichert werden." };
   }
+
+  // Best-effort (issue #166): see the comment above the other call site.
+  await syncScheduledJobToGoogleCalendar({
+    id: job.id,
+    organizationId: org.organizationId,
+    quoteId,
+    scheduledStart: job.scheduled_start,
+    scheduledEnd: job.scheduled_end,
+    notes: job.notes,
+    googleCalendarEventId: job.google_calendar_event_id,
+  });
 
   return { error: null, job };
 }
@@ -154,6 +184,15 @@ export async function cancelScheduledJob(quoteId: string): Promise<{ error: stri
     return { error: "Keine Organisation gefunden." };
   }
 
+  // Read the synced event id before deleting the row -- it only lives here,
+  // so once the row is gone there'd be nothing left to tell Google which
+  // event to remove.
+  const { data: existing } = await supabase
+    .from("scheduled_jobs")
+    .select("google_calendar_event_id")
+    .eq("quote_id", quoteId)
+    .maybeSingle();
+
   const { error: deleteError } = await supabase
     .from("scheduled_jobs")
     .delete()
@@ -162,6 +201,9 @@ export async function cancelScheduledJob(quoteId: string): Promise<{ error: stri
     console.error("Failed to cancel scheduled job:", deleteError);
     return { error: "Termin konnte nicht storniert werden." };
   }
+
+  // Best-effort (issue #166): see the sync comment in scheduleJob above.
+  await deleteSyncedGoogleCalendarEvent(org.organizationId, existing?.google_calendar_event_id ?? null);
 
   return { error: null };
 }
