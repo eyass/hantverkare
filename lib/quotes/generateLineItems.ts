@@ -10,10 +10,28 @@ export type PriceListItem = {
   category: string;
 };
 
+// Risk-flag categories for the German market (issue #193) -- see
+// docs/superpowers/specs/2026-07-23-ai-risk-flagging-design.md. Adapted from
+// Bliqat's "Bosse" persona risk flags (asbestos, housing-association rules),
+// translated to German-market equivalents: Asbest, WEG-Beschluss (shared
+// building approval), Denkmalschutz (heritage protection).
+export const RISK_FLAG_TYPES = ["asbestos", "weg_approval", "denkmalschutz"] as const;
+export type RiskFlagType = (typeof RISK_FLAG_TYPES)[number];
+
+export type RiskFlag = {
+  type: RiskFlagType;
+  message: string;
+};
+
+export type GenerateLineItemsResult = {
+  lineItems: LineItem[];
+  riskFlags: RiskFlag[];
+};
+
 const LINE_ITEMS_TOOL = {
   name: "submit_line_items",
   description:
-    "Submit the structured list of quote line items extracted from the job description.",
+    "Submit the structured list of quote line items extracted from the job description, plus any known German-market risk flags the job description surfaces.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -30,12 +48,32 @@ const LINE_ITEMS_TOOL = {
           required: ["description", "quantity", "unit", "unitPriceCents"],
         },
       },
+      riskFlags: {
+        type: "array" as const,
+        description:
+          "Zero or more known risk flags relevant to this job. Only include a flag when the description clearly matches its trigger condition -- leave empty if unsure.",
+        items: {
+          type: "object" as const,
+          properties: {
+            type: {
+              type: "string" as const,
+              enum: [...RISK_FLAG_TYPES],
+            },
+            message: { type: "string" as const },
+          },
+          required: ["type", "message"],
+        },
+      },
     },
     required: ["lineItems"],
   },
 };
 
 export function parseLineItemsToolInput(input: unknown): LineItem[] {
+  return parseGenerateLineItemsToolInput(input).lineItems;
+}
+
+export function parseGenerateLineItemsToolInput(input: unknown): GenerateLineItemsResult {
   if (
     typeof input !== "object" ||
     input === null ||
@@ -50,7 +88,7 @@ export function parseLineItemsToolInput(input: unknown): LineItem[] {
     throw new QuoteGenerationError("AI returned zero line items");
   }
 
-  return rawItems.map((raw, index) => {
+  const lineItems = rawItems.map((raw, index) => {
     if (
       typeof raw !== "object" ||
       raw === null ||
@@ -72,9 +110,56 @@ export function parseLineItemsToolInput(input: unknown): LineItem[] {
     }
     return item;
   });
+
+  const riskFlags = parseRiskFlags((input as { riskFlags?: unknown }).riskFlags);
+
+  return { lineItems, riskFlags };
 }
 
-function buildPrompt(description: string, priceList: PriceListItem[]): string {
+function parseRiskFlags(raw: unknown): RiskFlag[] {
+  if (raw === undefined || raw === null) {
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    // Malformed risk flags are non-critical for the core quoting flow --
+    // degrade gracefully to "no flags" rather than failing the whole
+    // generation (line items are the load-bearing part of this response).
+    return [];
+  }
+
+  const flags: RiskFlag[] = [];
+  for (const entry of raw) {
+    if (
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as Record<string, unknown>).type === "string" &&
+      (RISK_FLAG_TYPES as readonly string[]).includes((entry as Record<string, unknown>).type as string) &&
+      typeof (entry as Record<string, unknown>).message === "string" &&
+      (entry as Record<string, unknown>).message !== ""
+    ) {
+      flags.push({
+        type: (entry as Record<string, unknown>).type as RiskFlagType,
+        message: (entry as Record<string, unknown>).message as string,
+      });
+    }
+  }
+  return flags;
+}
+
+// Risk-flag trigger conditions (issue #193). Kept as an explicit instruction
+// block appended to the existing prompt rather than a second LLM call --
+// same single tool-use response carries both lineItems and riskFlags. These
+// are heuristic-assisted LLM judgments, not a certified compliance check --
+// see the in-app disclaimer in app/(app)/quotes/[id]/RiskFlagsNotice.tsx.
+const RISK_FLAG_INSTRUCTIONS = `Additionally, review the job description for these three known German-market risk categories and include a "riskFlags" entry for each one that clearly applies (leave riskFlags empty if none apply):
+
+1. "asbestos" -- the building was built or last renovated before roughly 1993 (Germany's asbestos ban year) AND the job involves demolishing/removing flooring, ceiling panels, facade panels, or old pipe insulation (classic asbestos-containing materials from that era).
+2. "weg_approval" -- the job affects common property in a multi-unit building (facade, roof, load-bearing walls, shared plumbing risers, balconies) -- this typically requires a WEG (Wohnungseigentümergemeinschaft) owners'-meeting resolution before work starts.
+3. "denkmalschutz" -- the building is described as old/historic/listed AND facade or structural changes are planned -- this may require Denkmalschutzbehörde (heritage authority) approval.
+
+Only flag a category when the description gives a clear, specific signal -- do not flag speculatively. For each flag, write a short German-language "message" explaining what to check and with whom (Hausverwaltung, Denkmalschutzbehörde, etc.).`;
+
+export function buildPrompt(description: string, priceList: PriceListItem[]): string {
   const priceListText = priceList
     .map(
       (p) =>
@@ -88,13 +173,15 @@ Price list:
 ${priceListText}
 
 Job description:
-${description}`;
+${description}
+
+${RISK_FLAG_INSTRUCTIONS}`;
 }
 
 export async function generateLineItems(
   description: string,
   priceList: PriceListItem[],
-): Promise<LineItem[]> {
+): Promise<GenerateLineItemsResult> {
   const anthropic = new Anthropic();
 
   let response;
@@ -117,5 +204,5 @@ export async function generateLineItems(
     throw new QuoteGenerationError("AI response did not include tool use");
   }
 
-  return parseLineItemsToolInput(toolUse.input);
+  return parseGenerateLineItemsToolInput(toolUse.input);
 }

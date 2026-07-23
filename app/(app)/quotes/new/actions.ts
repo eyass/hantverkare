@@ -53,8 +53,9 @@ export async function generateQuoteDraft(
   }
 
   let lineItems;
+  let riskFlags;
   try {
-    lineItems = await generateLineItems(
+    const generated = await generateLineItems(
       description,
       priceList.map((p) => ({
         label: p.label,
@@ -63,6 +64,8 @@ export async function generateQuoteDraft(
         category: p.category,
       })),
     );
+    lineItems = generated.lineItems;
+    riskFlags = generated.riskFlags;
   } catch (err) {
     if (err instanceof QuoteGenerationError) {
       console.error("Quote generation failed:", err);
@@ -85,6 +88,11 @@ export async function generateQuoteDraft(
       organization_id: org.organizationId,
       user_id: user.id,
       customer_id: customerId,
+      // Proactive risk flags (asbestos/WEG-approval/Denkmalschutz) returned
+      // alongside line items by the same AI call -- issue #193. Null when
+      // the model found nothing to flag, so the review-screen notice stays
+      // hidden.
+      ai_risk_flags: riskFlags.length > 0 ? riskFlags : null,
     })
     .select("id")
     .single();

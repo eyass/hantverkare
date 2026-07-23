@@ -15,6 +15,7 @@ import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
 import { CommentsSection } from "./CommentsSection";
 import { DepositSection } from "./DepositSection";
+import { RiskFlagsNotice, type RiskFlag } from "./RiskFlagsNotice";
 import type { QuoteCommentRow } from "./actions";
 
 type LineItem = {
@@ -45,6 +46,8 @@ type Quote = {
   deposit_percent: number | null;
   deposit_amount_cents: number | null;
   deposit_paid_at: string | null;
+  ai_risk_flags: RiskFlag[] | null;
+  ai_risk_flags_acknowledged_at: string | null;
 };
 
 type Member = {
@@ -297,6 +300,14 @@ export function QuoteEditor({
 
       {error && (
         <p className="rounded-xl border border-[#fecaca] bg-red-50 px-4 py-2 text-sm text-[#dc2626]">{error}</p>
+      )}
+
+      {quote.ai_risk_flags && quote.ai_risk_flags.length > 0 && (
+        <RiskFlagsNotice
+          quoteId={quote.id}
+          riskFlags={quote.ai_risk_flags}
+          acknowledgedAt={quote.ai_risk_flags_acknowledged_at}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">

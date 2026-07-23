@@ -378,6 +378,49 @@ export async function setDepositPercent(
   return { error: null };
 }
 
+/**
+ * Dismisses all AI risk flags on a quote (issue #193) by stamping
+ * ai_risk_flags_acknowledged_at. Deliberately never clears ai_risk_flags
+ * itself -- acknowledgement only hides the notice in the UI, the underlying
+ * flags remain in the data for later review.
+ */
+export async function acknowledgeRiskFlags(quoteId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({ ai_risk_flags_acknowledged_at: new Date().toISOString() })
+    .eq("id", quoteId);
+  if (updateError) {
+    console.error("Failed to acknowledge risk flags:", updateError);
+    return { error: "Hinweise konnten nicht bestätigt werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null };
+}
+
 type PhotoRow = {
   id: string;
   storage_path: string;
