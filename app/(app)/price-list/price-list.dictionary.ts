@@ -20,6 +20,7 @@ export type PriceListCopy = {
   wizardDescription: string;
   startBlank: string;
   importCsv: string;
+  supplierPriceUpdate: string;
   bulkAdjustTitle: string;
   bulkAdjustDescription: string;
   bulkAdjustPlaceholder: string;
@@ -48,6 +49,7 @@ export const PRICE_LIST_DICTIONARY: Dictionary<PriceListCopy> = {
       "Wähle dein Gewerk für eine vorausgefüllte Preisliste, die du vor dem Speichern anpassen kannst.",
     startBlank: "Leer starten",
     importCsv: "Preisliste aus CSV importieren",
+    supplierPriceUpdate: "Lieferanten-Preisupdate",
     bulkAdjustTitle: "Alle Preise anpassen",
     bulkAdjustDescription:
       "Erhöhe oder senke alle Preise auf einmal um einen Prozentsatz, z. B. bei gestiegenen Materialkosten.",
@@ -75,6 +77,7 @@ export const PRICE_LIST_DICTIONARY: Dictionary<PriceListCopy> = {
       "Choose your trade for a pre-filled price list you can adjust before saving.",
     startBlank: "Start blank",
     importCsv: "Import price list from CSV",
+    supplierPriceUpdate: "Supplier price update",
     bulkAdjustTitle: "Adjust all prices",
     bulkAdjustDescription:
       "Increase or decrease all prices at once by a percentage, e.g. when material costs rise.",
