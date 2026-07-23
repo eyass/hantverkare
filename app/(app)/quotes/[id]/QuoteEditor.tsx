@@ -363,11 +363,11 @@ export function QuoteEditor({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         {/* Line items card */}
-        <div className="rounded-2xl border border-[#e9edf2] bg-white overflow-hidden">
-          <table className="w-full border-collapse text-left text-sm">
+        <div className="rounded-2xl border border-[#e9edf2] bg-white overflow-x-auto">
+          <table className="w-full min-w-[880px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-[#e9edf2] bg-[#f8fafc] text-xs uppercase tracking-wide text-[#94a3b8]">
-                <th className="px-4 py-3 font-medium">Beschreibung</th>
+                <th className="px-4 py-3 font-medium min-w-[240px]">Beschreibung</th>
                 <th className="px-4 py-3 font-medium">Menge</th>
                 <th className="px-4 py-3 font-medium">Einheit</th>
                 <th className="px-4 py-3 font-medium">Einzelpreis</th>
@@ -397,7 +397,7 @@ export function QuoteEditor({
                 return (
                 <Fragment key={item.id}>
                 <tr className="border-b border-[#e9edf2] last:border-b-0">
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 min-w-[240px]">
                     <div className="flex items-center gap-2">
                       {item.item_type && (
                         <span
@@ -436,7 +436,12 @@ export function QuoteEditor({
                       />
                     </div>
                     {item.quantity_reasoning && (
-                      <p className="px-2 pt-0.5 text-xs text-[#94a3b8]">{item.quantity_reasoning}</p>
+                      <p
+                        className="line-clamp-2 px-2 pt-0.5 text-xs text-[#94a3b8]"
+                        title={item.quantity_reasoning}
+                      >
+                        {item.quantity_reasoning}
+                      </p>
                     )}
                   </td>
                   <td className="px-4 py-2">
