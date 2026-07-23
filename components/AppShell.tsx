@@ -15,6 +15,7 @@ import {
   Plug,
   Receipt,
   Settings as SettingsIcon,
+  Plug,
   Tag,
   TriangleAlert,
   UserCog,
