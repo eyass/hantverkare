@@ -104,7 +104,7 @@ export function CustomerEditor({ customers: initialCustomers }: { customers: Cus
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
         <div className="flex items-center gap-2">

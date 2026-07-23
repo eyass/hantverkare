@@ -145,7 +145,7 @@ export default async function SchedulePage({
   const pastGroups = groupByDay([...past].reverse());
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <h1 className="text-2xl font-semibold text-[#0f172a]">Termine</h1>
 
       <CustomerTimelineFilter customers={customerOptions ?? []} selectedCustomerId={null} />
@@ -236,7 +236,7 @@ async function CustomerTimelineView({
   })();
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-[#0f172a]">
           Zeitleiste{customer ? `: ${customer.name}` : ""}

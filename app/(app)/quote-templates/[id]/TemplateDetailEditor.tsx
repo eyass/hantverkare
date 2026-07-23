@@ -102,7 +102,7 @@ export function TemplateDetailEditor({
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-8 p-6 sm:p-8">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <Link href="/quote-templates" className="text-sm font-medium text-[#2563eb] hover:underline">

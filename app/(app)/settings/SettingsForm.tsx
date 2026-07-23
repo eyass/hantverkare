@@ -91,7 +91,7 @@ export function SettingsForm({
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-xl flex-col gap-6 p-6 sm:p-8">
       <h1 className="text-2xl font-semibold text-[#0f172a]">{t.businessTitle}</h1>
 
       <div className="rounded-2xl border border-[#e9edf2] bg-white p-6">

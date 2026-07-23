@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   BarChart3,
   Briefcase,
@@ -11,12 +11,14 @@ import {
   FileText,
   Hand,
   LayoutTemplate,
+  MoreHorizontal,
   Receipt,
   Settings as SettingsIcon,
   Tag,
   TriangleAlert,
   UserCog,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -86,6 +88,13 @@ function buildNavSections(
   return sections;
 }
 
+// The mobile bottom bar only has room for a handful of equal-width tabs
+// before labels start colliding/wrapping (confirmed at 375px). These four
+// are the primary, most-used destinations; everything else (including the
+// nested Settings sub-items) lives behind the "More" sheet, grouped exactly
+// like the desktop sidebar via buildNavSections().
+const PRIMARY_HREFS = ["/quotes", "/schedule", "/customers", "/jobs"];
+
 // The active item is the one whose href is the longest prefix of the current
 // path, so e.g. /settings/team highlights "Team" and not also "Einstellungen".
 function activeHref(pathname: string, items: NavItem[]): string | null {
@@ -112,10 +121,23 @@ export function AppShell({
   const pathname = usePathname();
   const { language } = useAppLanguage();
   const { fieldMode, toggleFieldMode } = useFieldMode();
+  const [moreOpen, setMoreOpen] = useState(false);
   const t = APP_SHELL_DICTIONARY[language];
   const sections = buildNavSections(t, role);
   const NAV_ITEMS = sections.flatMap((section) => section.items);
   const currentHref = activeHref(pathname, NAV_ITEMS);
+
+  const primaryNavItems = PRIMARY_HREFS.map((href) =>
+    NAV_ITEMS.find((item) => item.href === href),
+  ).filter((item): item is NavItem => Boolean(item));
+  // Everything not shown as a primary tab is grouped (reusing the same
+  // section titles as the desktop sidebar) inside the "More" sheet.
+  const moreSections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !PRIMARY_HREFS.includes(item.href)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <div className="flex min-h-screen">
@@ -209,13 +231,14 @@ export function AppShell({
         </div>
         <div className={`flex-1 ${fieldMode ? "pb-24" : "pb-16"} md:pb-0`}>{children}</div>
 
-        {/* Mobile bottom tabs */}
+        {/* Mobile bottom tabs: a handful of primary destinations plus a
+            "More" tab that opens a bottom sheet with everything else. */}
         <nav
           className={`fixed inset-x-0 bottom-0 flex border-t border-[#e9edf2] bg-white px-2 md:hidden ${
             fieldMode ? "py-3" : "py-2"
           }`}
         >
-          {NAV_ITEMS.map((item) => {
+          {primaryNavItems.map((item) => {
             const active = item.href === currentHref;
             const Icon = item.icon;
             return (
@@ -231,7 +254,79 @@ export function AppShell({
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg font-semibold ${
+              fieldMode ? "py-2.5 text-[12px]" : "py-1.5 text-[10.5px]"
+            } text-[#94a3b8]`}
+          >
+            <MoreHorizontal
+              className={fieldMode ? "h-[22px] w-[22px]" : "h-[16px] w-[16px]"}
+              aria-hidden="true"
+            />
+            <span>{t.more}</span>
+          </button>
         </nav>
+
+        {/* "More" bottom sheet: everything not shown as a primary tab,
+            grouped exactly like the desktop sidebar. */}
+        {moreOpen ? (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <button
+              type="button"
+              aria-label={t.closeMore}
+              onClick={() => setMoreOpen(false)}
+              className="absolute inset-0 bg-black/40"
+            />
+            <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-2xl bg-white p-4 pb-8 shadow-[0_-8px_24px_rgba(15,23,42,0.15)]">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-semibold text-[#0f172a]">{t.more}</span>
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen(false)}
+                  aria-label={t.closeMore}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#64748b] hover:bg-[#f4f6f8]"
+                >
+                  <X className="h-[18px] w-[18px]" aria-hidden="true" />
+                </button>
+              </div>
+              <nav className="flex flex-col gap-4">
+                {moreSections.map((section) => (
+                  <div
+                    key={section.title ?? section.items[0]?.href}
+                    className="flex flex-col gap-1"
+                  >
+                    {section.title ? (
+                      <div className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#94a3b8]">
+                        {section.title}
+                      </div>
+                    ) : null}
+                    {section.items.map((item) => {
+                      const active = item.href === currentHref;
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMoreOpen(false)}
+                          className={`flex items-center gap-2.5 rounded-[10px] py-2.5 text-sm font-semibold transition-colors ${
+                            item.nested ? "ml-3 pl-3 pr-3" : "px-3"
+                          } ${active ? "bg-[#eef2ff] text-[#2563eb]" : "text-[#0f172a] hover:bg-[#f4f6f8]"}`}
+                        >
+                          <Icon className="h-[18px] w-[18px] flex-none" aria-hidden="true" />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))}
+              </nav>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
