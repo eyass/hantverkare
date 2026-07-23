@@ -49,7 +49,7 @@ export default async function JobsPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <h1 className="text-2xl font-semibold text-[#0f172a]">Meine Jobs</h1>
       <p className="text-sm text-[#64748b]">
         Angebote, die dir zugewiesen wurden. Diese Ansicht ist schreibgeschützt --

@@ -111,7 +111,7 @@ export default async function ReportsPage({
   ];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <h1 className="text-2xl font-semibold text-[#0f172a]">{t.title}</h1>
 
       <div className="flex flex-col gap-3">

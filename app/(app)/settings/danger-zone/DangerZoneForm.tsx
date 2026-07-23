@@ -26,7 +26,7 @@ export function DangerZoneForm({ organizationName }: { organizationName: string 
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-xl flex-col gap-6 p-6 sm:p-8">
       <div>
         <h1 className="text-2xl font-semibold text-[#0f172a]">Danger Zone</h1>
         <p className="mt-1 text-sm text-[#64748b]">

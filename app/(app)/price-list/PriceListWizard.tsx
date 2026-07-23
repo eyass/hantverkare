@@ -70,7 +70,7 @@ export function PriceListWizard({ templates }: { templates: TemplateWithItems[] 
 
   if (step === "review" && selectedTemplate) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
         <h1 className="text-2xl font-semibold text-[#0f172a]">{selectedTemplate.tradeLabel}</h1>
         {error && <p className="text-sm text-[#dc2626]">{error}</p>}
         <div className="overflow-hidden rounded-2xl border border-[#e9edf2] bg-white">
@@ -135,7 +135,7 @@ export function PriceListWizard({ templates }: { templates: TemplateWithItems[] 
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <h1 className="text-2xl font-semibold text-[#0f172a]">{t.wizardTitle}</h1>
       <p className="text-sm text-[#64748b]">
         {t.wizardDescription}

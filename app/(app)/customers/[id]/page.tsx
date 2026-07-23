@@ -62,7 +62,7 @@ export default async function CustomerDetailPage({
   );
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6 sm:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[#0f172a]">{customer.name}</h1>
         <Link href="/customers" className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]">
