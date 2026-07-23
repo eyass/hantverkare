@@ -23,15 +23,20 @@ export type RiskFlag = {
   message: string;
 };
 
+const MAX_CLARIFYING_QUESTIONS = 3;
+
 export type GenerateLineItemsResult = {
   lineItems: LineItem[];
   riskFlags: RiskFlag[];
+  clarifyingQuestions: string[];
 };
 
 const LINE_ITEMS_TOOL = {
   name: "submit_line_items",
   description:
-    "Submit the structured list of quote line items extracted from the job description, plus any known German-market risk flags the job description surfaces.",
+    "Submit the structured list of quote line items extracted from the job description, " +
+    "plus any known German-market risk flags the job description surfaces, and optionally " +
+    "up to 3 clarifying questions if -- and only if -- a genuinely blocking detail is missing.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -63,6 +68,16 @@ const LINE_ITEMS_TOOL = {
           },
           required: ["type", "message"],
         },
+      },
+      clarifyingQuestions: {
+        type: "array" as const,
+        description:
+          "At most 3 short questions to ask the tradesperson, only for genuinely " +
+          "blocking ambiguity that prevents a confident estimate (e.g. a missing " +
+          "critical quantity or dimension). Omit or leave empty whenever a reasonable " +
+          "assumption can be made instead -- most job descriptions should NOT produce " +
+          "any questions.",
+        items: { type: "string" as const },
       },
     },
     required: ["lineItems"],
@@ -113,7 +128,19 @@ export function parseGenerateLineItemsToolInput(input: unknown): GenerateLineIte
 
   const riskFlags = parseRiskFlags((input as { riskFlags?: unknown }).riskFlags);
 
-  return { lineItems, riskFlags };
+  const rawQuestions = (input as { clarifyingQuestions?: unknown }).clarifyingQuestions;
+  let clarifyingQuestions: string[] = [];
+  if (rawQuestions !== undefined) {
+    if (!Array.isArray(rawQuestions) || rawQuestions.some((q) => typeof q !== "string")) {
+      throw new QuoteGenerationError("Malformed clarifyingQuestions: expected string array");
+    }
+    clarifyingQuestions = (rawQuestions as string[])
+      .map((q) => q.trim())
+      .filter((q) => q.length > 0)
+      .slice(0, MAX_CLARIFYING_QUESTIONS);
+  }
+
+  return { lineItems, riskFlags, clarifyingQuestions };
 }
 
 function parseRiskFlags(raw: unknown): RiskFlag[] {
@@ -148,9 +175,10 @@ function parseRiskFlags(raw: unknown): RiskFlag[] {
 
 // Risk-flag trigger conditions (issue #193). Kept as an explicit instruction
 // block appended to the existing prompt rather than a second LLM call --
-// same single tool-use response carries both lineItems and riskFlags. These
-// are heuristic-assisted LLM judgments, not a certified compliance check --
-// see the in-app disclaimer in app/(app)/quotes/[id]/RiskFlagsNotice.tsx.
+// same single tool-use response carries lineItems, riskFlags, and
+// clarifyingQuestions together. These are heuristic-assisted LLM judgments,
+// not a certified compliance check -- see the in-app disclaimer in
+// app/(app)/quotes/[id]/RiskFlagsNotice.tsx.
 const RISK_FLAG_INSTRUCTIONS = `Additionally, review the job description for these three known German-market risk categories and include a "riskFlags" entry for each one that clearly applies (leave riskFlags empty if none apply):
 
 1. "asbestos" -- the building was built or last renovated before roughly 1993 (Germany's asbestos ban year) AND the job involves demolishing/removing flooring, ceiling panels, facade panels, or old pipe insulation (classic asbestos-containing materials from that era).
@@ -168,6 +196,8 @@ export function buildPrompt(description: string, priceList: PriceListItem[]): st
     .join("\n");
 
   return `You are pricing a job for a German Handwerker (tradesperson) using their price list below. Given the job description, produce a list of line items with realistic quantities and unit prices drawn from the price list (or a reasonable estimate if nothing matches). All prices are in EUR cents.
+
+Prefer producing a complete draft with reasonable assumptions whenever you can -- the tradesperson reviews and edits every draft before sending it, so a confident best guess is far more useful than a stalled draft. Only include clarifyingQuestions (at most 3) when a detail is genuinely blocking -- you cannot produce any reasonable estimate without it (e.g. "Wie viele Quadratmeter hat das Badezimmer?" when materials can't be quantified at all without an area). Do NOT ask about stylistic preferences, exact brand/color choices, or anything you can safely default -- still produce the full lineItems draft even when you do ask a question.
 
 Price list:
 ${priceListText}

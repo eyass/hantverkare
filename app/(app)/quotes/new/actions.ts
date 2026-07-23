@@ -52,10 +52,9 @@ export async function generateQuoteDraft(
     return { error: "Bitte lege zuerst Preislistenpositionen an." };
   }
 
-  let lineItems;
-  let riskFlags;
+  let generated;
   try {
-    const generated = await generateLineItems(
+    generated = await generateLineItems(
       description,
       priceList.map((p) => ({
         label: p.label,
@@ -64,8 +63,6 @@ export async function generateQuoteDraft(
         category: p.category,
       })),
     );
-    lineItems = generated.lineItems;
-    riskFlags = generated.riskFlags;
   } catch (err) {
     if (err instanceof QuoteGenerationError) {
       console.error("Quote generation failed:", err);
@@ -74,7 +71,7 @@ export async function generateQuoteDraft(
     throw err;
   }
 
-  const pricedItems = lineItems.map(priceLineItem);
+  const pricedItems = generated.lineItems.map(priceLineItem);
   const totals = computeTotals(pricedItems);
 
   const { data: quote, error: quoteError } = await supabase
@@ -92,7 +89,13 @@ export async function generateQuoteDraft(
       // alongside line items by the same AI call -- issue #193. Null when
       // the model found nothing to flag, so the review-screen notice stays
       // hidden.
-      ai_risk_flags: riskFlags.length > 0 ? riskFlags : null,
+      ai_risk_flags: generated.riskFlags.length > 0 ? generated.riskFlags : null,
+      // Present only when the AI genuinely couldn't produce a confident
+      // draft without more detail -- see generateLineItems' prompt (issue
+      // #194). Left unresolved (null) until the tradesperson answers or
+      // explicitly skips on the quote review screen.
+      ai_clarifying_questions:
+        generated.clarifyingQuestions.length > 0 ? generated.clarifyingQuestions : null,
     })
     .select("id")
     .single();

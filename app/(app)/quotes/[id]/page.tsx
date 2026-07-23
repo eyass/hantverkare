@@ -17,7 +17,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select(
-      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, share_token, gallery_token, gallery_enabled, declined_at, decline_reason, assigned_to, deposit_percent, deposit_amount_cents, deposit_paid_at, ai_risk_flags, ai_risk_flags_acknowledged_at",
+      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, share_token, gallery_token, gallery_enabled, declined_at, decline_reason, assigned_to, deposit_percent, deposit_amount_cents, deposit_paid_at, ai_risk_flags, ai_risk_flags_acknowledged_at, ai_clarifying_questions, ai_clarifying_questions_resolved_at",
     )
     .eq("id", id)
     .single();
