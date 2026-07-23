@@ -56,6 +56,7 @@ type Quote = {
   ai_risk_flags_acknowledged_at: string | null;
   ai_clarifying_questions: string[] | null;
   ai_clarifying_questions_resolved_at: string | null;
+  viewed_at: string | null;
 };
 
 type Member = {
@@ -105,6 +106,10 @@ function statusBadgeClasses(status: string): string {
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
 }
 
 function formatPercent(ratio: number): string {
@@ -309,6 +314,13 @@ export function QuoteEditor({
         >
           {statusLabel(displayStatus)}
         </span>
+        {(displayStatus === "final" || displayStatus === "signed") && (
+          <span className="text-xs text-[#94a3b8]">
+            {quote.viewed_at
+              ? `Angesehen am ${formatDate(quote.viewed_at)}`
+              : "Noch nicht vom Kunden angesehen"}
+          </span>
+        )}
       </div>
       <p className="text-[#64748b]">{quote.customer_description}</p>
 
