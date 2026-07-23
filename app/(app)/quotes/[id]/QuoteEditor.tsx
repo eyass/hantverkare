@@ -129,6 +129,7 @@ export function QuoteEditor({
   quote,
   lineItems,
   invoice,
+  unbilledHours = 0,
   connectOnboarded,
   contract,
   photos,
@@ -142,6 +143,7 @@ export function QuoteEditor({
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
+  unbilledHours?: number;
   connectOnboarded: boolean;
   contract: Contract | null;
   photos: Photo[];
@@ -553,7 +555,12 @@ export function QuoteEditor({
           </a>
 
           {status === "signed" && (
-            <InvoiceSection quoteId={quote.id} invoice={invoice} connectOnboarded={connectOnboarded} />
+            <InvoiceSection
+              quoteId={quote.id}
+              invoice={invoice}
+              unbilledHours={unbilledHours}
+              connectOnboarded={connectOnboarded}
+            />
           )}
           {status === "signed" && <WarrantySection warranty={warranty} />}
 

@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
+import { listTimeEntries } from "./time-entry-actions";
+import { TimeTrackingSection } from "./TimeTrackingSection";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",
@@ -65,6 +67,8 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
     declinedAt: quote.declined_at,
   });
 
+  const { entries: timeEntries, totalHours } = await listTimeEntries(id);
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6 sm:p-8">
       <div className="flex flex-wrap items-center gap-3">
@@ -112,6 +116,12 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
           Gesamt: {formatEuros(quote.total_cents)}
         </span>
       </div>
+
+      <TimeTrackingSection
+        quoteId={id}
+        initialEntries={timeEntries}
+        initialTotalHours={totalHours}
+      />
     </div>
   );
 }

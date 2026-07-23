@@ -18,6 +18,7 @@ import {
   type HistoricalQuote,
   type UpsellSuggestion,
 } from "@/lib/quotes/upsellSuggestions";
+import { buildLaborLineItem, sumHours } from "@/lib/timeTracking/laborLineItem";
 
 type UpdateLineItemInput = {
   description: string;
@@ -142,7 +143,49 @@ type CreateInvoiceResult =
   | { error: string; invoice?: never }
   | { error: null; invoice: InvoiceRow };
 
-export async function createInvoice(quoteId: string): Promise<CreateInvoiceResult> {
+/**
+ * Returns the total unbilled hours logged against the scheduled job behind a
+ * quote, for the "Erfasste Arbeitszeit als Position hinzufügen" checkbox on
+ * the invoice-creation UI (issue #195). Since a quote maps to at most one
+ * scheduled job (unique quote_id on scheduled_jobs) and an invoice can only
+ * ever be created once per quote, ALL of a job's time entries are "unbilled"
+ * the first time this runs -- there is no separate billed/unbilled flag on
+ * time_entries.
+ */
+export async function getUnbilledHoursForQuote(quoteId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: job } = await supabase
+    .from("scheduled_jobs")
+    .select("id")
+    .eq("quote_id", quoteId)
+    .maybeSingle();
+  if (!job) {
+    return 0;
+  }
+  const { data: entries } = await supabase
+    .from("time_entries")
+    .select("hours")
+    .eq("job_id", job.id);
+  return sumHours((entries ?? []).map((e) => ({ hours: Number(e.hours) })));
+}
+
+/**
+ * Creates the invoice for a signed quote. When `includeTimeEntries` is true
+ * (opt-in checkbox, never automatic -- see InvoiceSection.tsx), first
+ * appends a "Arbeitszeit: X Std." line item to the quote's line items
+ * summarizing the linked job's logged hours, and recomputes the quote's
+ * totals before snapshotting them onto the invoice. This intentionally
+ * mutates the quote's line items even though it's already signed -- the
+ * usual "quotes are immutable once signed" rule (enforced by updateLineItem
+ * checking status === 'draft') is a UI-editing guard, not a hard invariant;
+ * this one additive, tradesperson-confirmed append is the one sanctioned
+ * exception, matching how the design spec explicitly calls this an opt-in
+ * reconciliation step rather than a live edit.
+ */
+export async function createInvoice(
+  quoteId: string,
+  includeTimeEntries: boolean = false,
+): Promise<CreateInvoiceResult> {
   const supabase = await createClient();
 
   const {
@@ -175,6 +218,63 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
     return { error: null, invoice: existingInvoice };
   }
 
+  let subtotalCents = quote.subtotal_cents;
+  let vatCents = quote.vat_cents;
+  let totalCents = quote.total_cents;
+
+  if (includeTimeEntries) {
+    const totalHours = await getUnbilledHoursForQuote(quoteId);
+    const laborItem = buildLaborLineItem(totalHours);
+    if (laborItem) {
+      const priced = priceLineItem(laborItem);
+
+      const { data: existingItems } = await supabase
+        .from("quote_line_items")
+        .select("position, line_total_cents")
+        .eq("quote_id", quoteId)
+        .order("position", { ascending: false })
+        .limit(1);
+      const nextPosition = (existingItems?.[0]?.position ?? -1) + 1;
+
+      const { error: laborInsertError } = await supabase.from("quote_line_items").insert({
+        quote_id: quoteId,
+        description: priced.description,
+        quantity: priced.quantity,
+        unit: priced.unit,
+        unit_price_cents: priced.unitPriceCents,
+        line_total_cents: priced.lineTotalCents,
+        position: nextPosition,
+        organization_id: org.organizationId,
+        user_id: user.id,
+      });
+      if (laborInsertError) {
+        console.error("Failed to append labor line item:", laborInsertError);
+        return { error: "Arbeitszeit-Position konnte nicht hinzugefügt werden." };
+      }
+
+      const { data: allItems } = await supabase
+        .from("quote_line_items")
+        .select("quantity, unit, unit_price_cents, description")
+        .eq("quote_id", quoteId);
+      const totals = computeTotals(
+        (allItems ?? []).map((item) => priceLineItem({
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unitPriceCents: item.unit_price_cents,
+        })),
+      );
+      subtotalCents = totals.subtotalCents;
+      vatCents = totals.vatCents;
+      totalCents = totals.totalCents;
+
+      await supabase
+        .from("quotes")
+        .update({ subtotal_cents: subtotalCents, vat_cents: vatCents, total_cents: totalCents })
+        .eq("id", quoteId);
+    }
+  }
+
   const { data: invoiceNumber, error: rpcError } = await supabase.rpc("next_invoice_number");
   if (rpcError || !invoiceNumber) {
     console.error("Failed to generate invoice number:", rpcError);
@@ -188,9 +288,9 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
       user_id: user.id,
       quote_id: quoteId,
       invoice_number: invoiceNumber,
-      subtotal_cents: quote.subtotal_cents,
-      vat_cents: quote.vat_cents,
-      total_cents: quote.total_cents,
+      subtotal_cents: subtotalCents,
+      vat_cents: vatCents,
+      total_cents: totalCents,
     })
     .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, payment_status, amount_paid_cents")
     .single();

@@ -34,23 +34,30 @@ function paymentStatusBadgeClasses(status: Invoice["payment_status"]): string {
   return "bg-[#f1f5f9] text-[#64748b]";
 }
 
+function formatHours(hours: number): string {
+  return hours.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function InvoiceSection({
   quoteId,
   invoice: initialInvoice,
+  unbilledHours = 0,
   connectOnboarded,
 }: {
   quoteId: string;
   invoice: Invoice | null;
+  unbilledHours?: number;
   connectOnboarded: boolean;
 }) {
   const [invoice, setInvoice] = useState(initialInvoice);
   const [error, setError] = useState<string | null>(null);
+  const [includeTimeEntries, setIncludeTimeEntries] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isPaymentPending, startPaymentTransition] = useTransition();
 
   function handleCreateInvoice() {
     startTransition(async () => {
-      const result = await createInvoice(quoteId);
+      const result = await createInvoice(quoteId, includeTimeEntries);
       if (result.error !== null) {
         setError(result.error);
         return;
@@ -124,13 +131,28 @@ export function InvoiceSection({
           )}
         </>
       ) : (
-        <button
-          onClick={handleCreateInvoice}
-          disabled={isPending}
-          className="w-full rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
-        >
-          Rechnung erstellen
-        </button>
+        <>
+          {unbilledHours > 0 && (
+            <label className="flex items-start gap-2 rounded-xl border border-[#e9edf2] bg-white px-3 py-2.5 text-sm text-[#0f172a]">
+              <input
+                type="checkbox"
+                checked={includeTimeEntries}
+                onChange={(event) => setIncludeTimeEntries(event.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Erfasste Arbeitszeit als Position hinzufügen ({formatHours(unbilledHours)} Std.)
+              </span>
+            </label>
+          )}
+          <button
+            onClick={handleCreateInvoice}
+            disabled={isPending}
+            className="w-full rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_16px_rgba(37,99,235,0.3)] transition-colors hover:bg-[#1d4ed8] disabled:opacity-50"
+          >
+            {isPending ? "Wird vorbereitet…" : "Rechnung erstellen"}
+          </button>
+        </>
       )}
     </div>
   );
