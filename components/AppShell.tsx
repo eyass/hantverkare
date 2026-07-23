@@ -12,6 +12,7 @@ import {
   Hand,
   LayoutTemplate,
   MoreHorizontal,
+  Plug,
   Receipt,
   Settings as SettingsIcon,
   Tag,
@@ -74,6 +75,12 @@ function buildNavSections(
         ...(role === "owner"
           ? [
               { href: "/settings/team", label: t.nav.team, icon: UserCog, nested: true },
+              {
+                href: "/settings/integrations",
+                label: t.nav.integrations,
+                icon: Plug,
+                nested: true,
+              },
               {
                 href: "/settings/danger-zone",
                 label: t.nav.dangerZone,
