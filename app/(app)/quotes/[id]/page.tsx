@@ -5,7 +5,7 @@ import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { getOrgMembers } from "@/lib/organizations/getOrgMembers";
 import { QuoteEditor } from "./QuoteEditor";
 import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
-import { getUpsellSuggestions } from "./actions";
+import { getUpsellSuggestions, getUnbilledHoursForQuote } from "./actions";
 import { getCostEstimationSuggestions } from "@/lib/quotes/getCostEstimationSuggestions";
 
 const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a page view
@@ -133,11 +133,18 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   // there's nothing left to add.
   const upsellSuggestions = quote.status === "draft" ? await getUpsellSuggestions(id) : [];
 
+  // Only worth computing once there's a scheduled job with hours to bill and
+  // no invoice yet -- once an invoice exists, hours were already reconciled
+  // (or the tradesperson opted not to) and can't be appended again.
+  const unbilledHours =
+    scheduledJob && !invoice ? await getUnbilledHoursForQuote(id) : 0;
+
   return (
     <QuoteEditor
       quote={quote}
       lineItems={lineItems ?? []}
       invoice={invoice ?? null}
+      unbilledHours={unbilledHours}
       connectOnboarded={connectOnboarded}
       contract={contract ?? null}
       photos={photos}
