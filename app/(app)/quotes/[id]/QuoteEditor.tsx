@@ -56,6 +56,8 @@ type Invoice = {
   subtotal_cents: number;
   vat_cents: number;
   total_cents: number;
+  payment_status: "unpaid" | "partial" | "paid";
+  amount_paid_cents: number;
 };
 
 type Photo = {
@@ -117,6 +119,7 @@ export function QuoteEditor({
   quote,
   lineItems,
   invoice,
+  connectOnboarded,
   contract,
   photos,
   warranty,
@@ -129,6 +132,7 @@ export function QuoteEditor({
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
+  connectOnboarded: boolean;
   contract: Contract | null;
   photos: Photo[];
   warranty: WarrantyRecord | null;
@@ -511,7 +515,9 @@ export function QuoteEditor({
             Als PDF herunterladen
           </a>
 
-          {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
+          {status === "signed" && (
+            <InvoiceSection quoteId={quote.id} invoice={invoice} connectOnboarded={connectOnboarded} />
+          )}
           {status === "signed" && <WarrantySection warranty={warranty} />}
 
           {status === "signed" && <ContractSection quoteId={quote.id} contract={contract} />}

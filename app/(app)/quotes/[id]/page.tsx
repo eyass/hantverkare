@@ -72,9 +72,23 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+    .select(
+      "id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, payment_status, amount_paid_cents",
+    )
     .eq("quote_id", id)
     .maybeSingle();
+
+  // Payment collection (issue #131) only makes sense once the org has
+  // finished Stripe Connect onboarding -- read-only flag, no secrets exposed
+  // to the client.
+  const { data: orgRow } = org
+    ? await supabase
+        .from("organizations")
+        .select("stripe_connect_onboarded")
+        .eq("id", org.organizationId)
+        .maybeSingle()
+    : { data: null };
+  const connectOnboarded = orgRow?.stripe_connect_onboarded ?? false;
 
   const { data: warranty } = await supabase
     .from("warranty_records")
@@ -124,6 +138,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       quote={quote}
       lineItems={lineItems ?? []}
       invoice={invoice ?? null}
+      connectOnboarded={connectOnboarded}
       contract={contract ?? null}
       photos={photos}
       warranty={warranty ?? null}

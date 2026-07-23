@@ -8,5 +8,6 @@ Open manual steps, in the order to work through them:
 2. [#66 — QA team permission toggles](https://github.com/eyass/hantverkare/issues/66)
 3. [#67 — Real-device QA for 2FA](https://github.com/eyass/hantverkare/issues/67)
 4. [#68 — Go live with real Stripe](https://github.com/eyass/hantverkare/issues/68) (independent of 1-3, sequenced last only because it's the highest-stakes one)
+5. [#188 — Apply migration 0032 + configure Stripe Connect](https://github.com/eyass/hantverkare/issues/188) (issue #131, online payment collection on invoices -- sequence after #68)
 
-All schema migrations (0001–0014) are already applied. Historical migration SQL lives in `supabase/migrations/`, not duplicated here.
+Historical migration SQL lives in `supabase/migrations/`, not duplicated here.

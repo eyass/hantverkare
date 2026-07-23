@@ -24,6 +24,8 @@ export type SettingsCopy = {
   exportTitle: string;
   exportDescription: string;
   exportButton: string;
+  paymentsTitle: string;
+  paymentsDescription: string;
 };
 
 export const SETTINGS_DICTIONARY: Dictionary<SettingsCopy> = {
@@ -53,6 +55,8 @@ export const SETTINGS_DICTIONARY: Dictionary<SettingsCopy> = {
     exportDescription:
       "Lade eine vollständige Kopie aller Angebote, Kunden, Rechnungen und Preislisten deiner Organisation herunter (Art. 15 DSGVO).",
     exportButton: "Daten exportieren",
+    paymentsTitle: "Online-Zahlungen",
+    paymentsDescription: "Stripe verbinden, damit Kunden Rechnungen direkt online bezahlen können.",
   },
   en: {
     businessTitle: "Company details",
@@ -80,5 +84,7 @@ export const SETTINGS_DICTIONARY: Dictionary<SettingsCopy> = {
     exportDescription:
       "Download a full copy of all quotes, customers, invoices, and price lists for your organization (GDPR Art. 15).",
     exportButton: "Export data",
+    paymentsTitle: "Online payments",
+    paymentsDescription: "Connect Stripe so customers can pay invoices directly online.",
   },
 };
