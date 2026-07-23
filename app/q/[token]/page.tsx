@@ -16,14 +16,19 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   const { token } = await params;
   const supabase = createAdminClient();
 
-  const { data: quote } = await supabase
+  const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select(
       "id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name, declined_at, decline_reason",
     )
     .eq("share_token", token)
     .single();
-  if (!quote) notFound();
+  if (!quote) {
+    if (quoteError) {
+      console.error("Failed to load public quote by share_token", quoteError);
+    }
+    notFound();
+  }
 
   // Defense in depth: a draft quote's pricing detail is never fetched or rendered for
   // the public link, even though an unguessable share_token is the primary access

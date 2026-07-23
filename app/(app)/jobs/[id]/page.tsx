@@ -32,14 +32,19 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: quote } = await supabase
+  const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select(
       "id, customer_description, status, subtotal_cents, vat_cents, total_cents, declined_at, decline_reason, assigned_to",
     )
     .eq("id", id)
     .maybeSingle();
-  if (!quote) notFound();
+  if (!quote) {
+    if (quoteError) {
+      console.error("Failed to load job/quote", id, quoteError);
+    }
+    notFound();
+  }
   if (quote.assigned_to !== user.id) {
     // Not this user's assigned job -- send them to the full editor instead
     // (ordinary org RLS still governs whether they can view it there).
