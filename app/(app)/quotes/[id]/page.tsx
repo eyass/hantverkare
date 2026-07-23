@@ -14,14 +14,23 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: quote } = await supabase
+  const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select(
       "id, customer_description, status, subtotal_cents, vat_cents, total_cents, share_token, gallery_token, gallery_enabled, declined_at, decline_reason, assigned_to",
     )
     .eq("id", id)
     .single();
-  if (!quote) notFound();
+  if (!quote) {
+    // A query error (e.g. a column that doesn't exist yet because a pending
+    // migration hasn't been applied) looks identical to "no such row" from
+    // here on -- log it distinctly so it's diagnosable in server logs instead
+    // of just presenting as an indistinguishable 404.
+    if (quoteError) {
+      console.error("Failed to load quote", id, quoteError);
+    }
+    notFound();
+  }
 
   const { data: commentRows } = await supabase
     .from("quote_comments")

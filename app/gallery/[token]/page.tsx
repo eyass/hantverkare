@@ -19,13 +19,18 @@ export default async function PublicGalleryPage({ params }: { params: Promise<{ 
   const { token } = await params;
   const supabase = createAdminClient();
 
-  const { data: quote } = await supabase
+  const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select("id, customer_description, gallery_enabled")
     .eq("gallery_token", token)
     .eq("gallery_enabled", true)
     .maybeSingle();
-  if (!quote) notFound();
+  if (!quote) {
+    if (quoteError) {
+      console.error("Failed to load public gallery by gallery_token", quoteError);
+    }
+    notFound();
+  }
 
   const { data: photoRows, error: photosError } = await supabase
     .from("quote_photos")

@@ -10,12 +10,17 @@ export default async function QuoteTemplateDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: template } = await supabase
+  const { data: template, error: templateError } = await supabase
     .from("quote_templates")
     .select("id, name, created_at")
     .eq("id", id)
     .single();
-  if (!template) notFound();
+  if (!template) {
+    if (templateError) {
+      console.error("Failed to load quote template", id, templateError);
+    }
+    notFound();
+  }
 
   const { data: items, error: itemsError } = await supabase
     .from("quote_template_items")
