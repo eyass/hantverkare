@@ -7,10 +7,12 @@ import { sendDeclinedNotification } from "@/lib/notifications/sendDeclinedEmail"
 import { sendQuoteCommentNotification } from "@/lib/notifications/sendQuoteCommentEmail";
 import { sendSmsNotification, buildSignedSmsBody } from "@/lib/notifications/sendSmsNotification";
 import { decrementStockOnSign } from "@/lib/inventory/decrementStockOnSign";
+import { createDepositCheckoutSession } from "@/lib/payments/createDepositCheckoutSession";
 
-type SignQuoteResult = { error: string | null };
+type SignQuoteResult = { error: string | null; depositCheckoutUrl?: string | null };
 type DeclineQuoteResult = { error: string | null };
 type AddCommentResult = { error: string | null };
+type RequestDepositCheckoutResult = { error: string | null; url?: string | null };
 
 const MAX_DECLINE_REASON_LENGTH = 500;
 const MAX_COMMENT_LENGTH = 2000;
@@ -43,7 +45,9 @@ export async function signQuote(token: string, signerName: string): Promise<Sign
     .eq("share_token", token)
     .eq("status", "final")
     .is("declined_at", null)
-    .select("id, user_id, customer_description, organization_id, customer_id, signed_at");
+    .select(
+      "id, user_id, customer_description, organization_id, customer_id, signed_at, deposit_percent, total_cents",
+    );
   if (error || !data || data.length === 0) {
     console.error("Failed to sign quote:", error);
     return { error: "Angebot konnte nicht unterschrieben werden. Es ist möglicherweise nicht mehr verfügbar." };
@@ -140,7 +144,114 @@ export async function signQuote(token: string, signerName: string): Promise<Sign
     console.error("Failed to decrement stock after signing:", inventoryErr);
   }
 
-  return { error: null };
+  // Deposit (Anzahlung) collection, issue #162: if the tradesperson
+  // configured a deposit_percent on this quote, prepare a Stripe Checkout
+  // Session for that share of the total right at signing time, on the org's
+  // connected Stripe account (see lib/payments/createDepositCheckoutSession.ts
+  // for the #131 Stripe Connect dependency and its graceful-skip behavior).
+  // Best-effort, exactly like the notifications/warranty/stock blocks above
+  // -- must never affect the result returned to the customer, who has
+  // already successfully signed at this point. If no Stripe Connect account
+  // is set up yet (e.g. #131 hasn't landed, or the org hasn't onboarded),
+  // this silently no-ops rather than blocking signing.
+  let depositCheckoutUrl: string | null = null;
+  try {
+    const quote = data[0];
+    if (quote.deposit_percent) {
+      const depositAmountCents = Math.round((quote.total_cents * quote.deposit_percent) / 100);
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+      const result = await createDepositCheckoutSession({
+        supabase,
+        organizationId: quote.organization_id,
+        quoteId: quote.id,
+        quoteDescription: quote.customer_description ?? "",
+        depositAmountCents,
+        successUrl: `${siteUrl}/q/${token}?deposit=success`,
+        cancelUrl: `${siteUrl}/q/${token}?deposit=cancelled`,
+      });
+      if (result.skipped) {
+        console.log("Deposit collection skipped at signing:", result.reason);
+      } else {
+        const { error: depositUpdateError } = await supabase
+          .from("quotes")
+          .update({
+            deposit_amount_cents: depositAmountCents,
+            deposit_stripe_checkout_session_id: result.sessionId,
+          })
+          .eq("id", quote.id);
+        if (depositUpdateError) {
+          console.error("Failed to persist deposit checkout session:", depositUpdateError);
+        } else {
+          depositCheckoutUrl = result.url;
+        }
+      }
+    }
+  } catch (depositErr) {
+    console.error("Failed to prepare deposit checkout at signing:", depositErr);
+  }
+
+  return { error: null, depositCheckoutUrl };
+}
+
+// Re-generates a deposit Checkout Session for an already-signed quote
+// (issue #162). Used by the customer-facing "pay deposit" prompt on page
+// reload/re-visit, since the URL returned inline from signQuote isn't
+// persisted anywhere -- Stripe Checkout Session URLs also expire after 24h,
+// so a fresh one may be needed even shortly after signing. Mirrors
+// addCustomerComment's security model: share_token is the only lookup key,
+// via the service-role admin client.
+export async function requestDepositCheckout(token: string): Promise<RequestDepositCheckoutResult> {
+  const supabase = createAdminClient();
+
+  const { data: quote, error } = await supabase
+    .from("quotes")
+    .select("id, organization_id, customer_description, total_cents, status, deposit_percent, deposit_paid_at")
+    .eq("share_token", token)
+    .maybeSingle();
+  if (error || !quote) {
+    console.error("Failed to look up quote for deposit checkout request:", error);
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status !== "signed") {
+    return { error: "Angebot ist noch nicht unterschrieben." };
+  }
+  if (!quote.deposit_percent) {
+    return { error: "Für dieses Angebot ist keine Anzahlung vorgesehen." };
+  }
+  if (quote.deposit_paid_at) {
+    return { error: "Anzahlung wurde bereits bezahlt." };
+  }
+
+  const depositAmountCents = Math.round((quote.total_cents * quote.deposit_percent) / 100);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const result = await createDepositCheckoutSession({
+    supabase,
+    organizationId: quote.organization_id,
+    quoteId: quote.id,
+    quoteDescription: quote.customer_description ?? "",
+    depositAmountCents,
+    successUrl: `${siteUrl}/q/${token}?deposit=success`,
+    cancelUrl: `${siteUrl}/q/${token}?deposit=cancelled`,
+  });
+
+  if (result.skipped) {
+    console.error("Deposit checkout session request skipped:", result.reason);
+    return { error: "Anzahlung kann derzeit nicht online bezahlt werden. Bitte kontaktieren Sie uns direkt." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({
+      deposit_amount_cents: depositAmountCents,
+      deposit_stripe_checkout_session_id: result.sessionId,
+    })
+    .eq("id", quote.id);
+  if (updateError) {
+    console.error("Failed to persist re-requested deposit checkout session:", updateError);
+    return { error: "Zahlungslink konnte nicht vorbereitet werden." };
+  }
+
+  return { error: null, url: result.url };
 }
 
 // Mirrors signQuote's security model exactly: the share_token (not a
