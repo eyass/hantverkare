@@ -8,6 +8,9 @@ import { syncInvoiceToLexoffice } from "@/lib/integrations/lexoffice/sync";
 import { createInvoiceCheckoutSession } from "@/lib/stripe/connect";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
+import { generateLineItems, QuoteGenerationError, type RiskFlag } from "@/lib/quotes/generateLineItems";
+import { matchPriceListItemId } from "@/lib/inventory/matchPriceListItem";
+import { buildClarifyingQuestionsUpdate, buildResolvedTimestamp } from "@/lib/quotes/clarifyingQuestions";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
 import { computeNextDueDate, isValidContractInterval, type ContractInterval } from "@/lib/contracts/interval";
 import {
@@ -419,6 +422,217 @@ export async function acknowledgeRiskFlags(quoteId: string): Promise<{ error: st
 
   revalidatePath(`/quotes/${quoteId}`);
   return { error: null };
+}
+
+/**
+ * "Skip -- use my best guess" (issue #194): the tradesperson explicitly
+ * dismisses the AI's clarifying questions without adding more detail,
+ * keeping the already-generated draft as-is. Set-once-never-unset, same
+ * pattern as deposit_paid_at / review_request_sent_at elsewhere on this
+ * table -- resolving is a one-way action, there's nothing to "unresolve".
+ */
+export async function resolveClarifyingQuestions(quoteId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({ ai_clarifying_questions_resolved_at: buildResolvedTimestamp() })
+    .eq("id", quoteId)
+    .is("ai_clarifying_questions_resolved_at", null);
+  if (updateError) {
+    console.error("Failed to resolve clarifying questions:", updateError);
+    return { error: "Konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null };
+}
+
+export type RegenerateQuoteDraftResult =
+  | {
+      error: string;
+      lineItems?: never;
+      totals?: never;
+      clarifyingQuestions?: never;
+      riskFlags?: never;
+    }
+  | {
+      error: null;
+      lineItems: LineItemRow[];
+      totals: { subtotalCents: number; vatCents: number; totalCents: number };
+      clarifyingQuestions: string[];
+      riskFlags: RiskFlag[];
+    };
+
+/**
+ * "Details ergänzen" (issue #194): appends additional detail (a follow-up
+ * voice note transcript or typed text) onto the quote's original
+ * description and re-runs AI generation against the combined text,
+ * replacing the current draft's line items entirely -- same one-shot
+ * regeneration semantics as the initial generateQuoteDraft, just against an
+ * existing quote instead of creating a new one. Only allowed on a draft
+ * that hasn't been finalized/signed yet, since finalizing snapshots the
+ * quote for the customer-facing flow.
+ */
+export async function regenerateQuoteDraft(
+  quoteId: string,
+  additionalText: string,
+): Promise<RegenerateQuoteDraftResult> {
+  const trimmed = additionalText.trim();
+  if (trimmed.length === 0) {
+    return { error: "Bitte ergänze eine Beschreibung." };
+  }
+  if (trimmed.length > 2000) {
+    return { error: "Die Ergänzung ist zu lang (max. 2000 Zeichen)." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id, status, customer_description")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status !== "draft") {
+    return { error: "Angebot kann nicht mehr aktualisiert werden." };
+  }
+
+  const { data: priceList, error: priceListError } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit, unit_price_cents, category");
+  if (priceListError || !priceList || priceList.length === 0) {
+    console.error("Failed to load price list:", priceListError);
+    return { error: "Preisliste konnte nicht geladen werden." };
+  }
+
+  const nextDescription = `${quote.customer_description}\n\n${trimmed}`;
+
+  let generated;
+  try {
+    generated = await generateLineItems(
+      nextDescription,
+      priceList.map((p) => ({
+        label: p.label,
+        unit: p.unit,
+        unitPriceCents: p.unit_price_cents,
+        category: p.category,
+      })),
+    );
+  } catch (err) {
+    if (err instanceof QuoteGenerationError) {
+      console.error("Quote regeneration failed:", err);
+      return { error: `Angebot konnte nicht aktualisiert werden: ${err.message}` };
+    }
+    throw err;
+  }
+
+  const pricedItems = generated.lineItems.map(priceLineItem);
+  const totals = computeTotals(pricedItems);
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({
+      customer_description: nextDescription,
+      subtotal_cents: totals.subtotalCents,
+      vat_cents: totals.vatCents,
+      total_cents: totals.totalCents,
+      // A fresh regeneration either resolves the old questions (no new ones
+      // came back) or replaces them with a new open set -- either way the
+      // previous resolution state no longer applies. See
+      // lib/quotes/clarifyingQuestions.ts for the (unit-tested) transition.
+      ...buildClarifyingQuestionsUpdate(generated.clarifyingQuestions),
+      // Risk flags are also regenerated from scratch on the second pass
+      // (issue #193 + #194 interaction) -- don't let a re-run silently drop
+      // flags found the first time, and don't let stale flags survive if
+      // the added detail resolves them. Any prior acknowledgement no longer
+      // applies to a fresh set of flags.
+      ai_risk_flags: generated.riskFlags.length > 0 ? generated.riskFlags : null,
+      ai_risk_flags_acknowledged_at: null,
+    })
+    .eq("id", quoteId);
+  if (updateError) {
+    console.error("Failed to update quote for regeneration:", updateError);
+    return { error: "Angebot konnte nicht gespeichert werden." };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("quote_line_items")
+    .delete()
+    .eq("quote_id", quoteId);
+  if (deleteError) {
+    console.error("Failed to clear old line items:", deleteError);
+    return { error: "Positionen konnten nicht aktualisiert werden." };
+  }
+
+  const { data: insertedItems, error: insertError } = await supabase
+    .from("quote_line_items")
+    .insert(
+      pricedItems.map((item, index) => ({
+        quote_id: quoteId,
+        description: item.description,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price_cents: item.unitPriceCents,
+        line_total_cents: item.lineTotalCents,
+        position: index,
+        organization_id: org.organizationId,
+        user_id: user.id,
+        price_list_item_id: matchPriceListItemId(
+          { description: item.description, unit: item.unit, unitPriceCents: item.unitPriceCents },
+          priceList,
+        ),
+      })),
+    )
+    .select("id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position");
+  if (insertError || !insertedItems) {
+    console.error("Failed to insert regenerated line items:", insertError);
+    return { error: "Positionen konnten nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return {
+    error: null,
+    lineItems: insertedItems,
+    totals,
+    clarifyingQuestions: generated.clarifyingQuestions,
+    riskFlags: generated.riskFlags,
+  };
 }
 
 type PhotoRow = {

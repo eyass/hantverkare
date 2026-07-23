@@ -135,6 +135,54 @@ describe("parseGenerateLineItemsToolInput risk flags (issue #193)", () => {
   });
 });
 
+describe("parseGenerateLineItemsToolInput clarifying questions (issue #194)", () => {
+  const baseLineItems = [
+    { description: "Spüle austauschen", quantity: 1, unit: "Stück", unitPriceCents: 8000 },
+  ];
+
+  it("returns an empty clarifyingQuestions array when the field is absent", () => {
+    const result = parseGenerateLineItemsToolInput({ lineItems: baseLineItems });
+    expect(result.clarifyingQuestions).toEqual([]);
+  });
+
+  it("parses clarifying questions when present, capped at 3, trimmed and empty ones dropped", () => {
+    const input = {
+      lineItems: baseLineItems,
+      clarifyingQuestions: [
+        " Wie viele Quadratmeter hat das Bad? ",
+        "",
+        "Welche Fliesenfarbe?",
+        "Gibt es einen Bodenablauf?",
+        "Ist Strom vorhanden?",
+      ],
+    };
+    const result = parseGenerateLineItemsToolInput(input);
+    expect(result.clarifyingQuestions).toEqual([
+      "Wie viele Quadratmeter hat das Bad?",
+      "Welche Fliesenfarbe?",
+      "Gibt es einen Bodenablauf?",
+    ]);
+  });
+
+  it("throws when clarifyingQuestions contains a non-string", () => {
+    const input = {
+      lineItems: baseLineItems,
+      clarifyingQuestions: ["ok", 5],
+    };
+    expect(() => parseGenerateLineItemsToolInput(input)).toThrow(QuoteGenerationError);
+  });
+
+  it("returns both riskFlags and clarifyingQuestions together when both are present", () => {
+    const result = parseGenerateLineItemsToolInput({
+      lineItems: baseLineItems,
+      riskFlags: [{ type: "asbestos", message: "Baujahr vor 1993." }],
+      clarifyingQuestions: ["Wie viele Quadratmeter?"],
+    });
+    expect(result.riskFlags).toHaveLength(1);
+    expect(result.clarifyingQuestions).toEqual(["Wie viele Quadratmeter?"]);
+  });
+});
+
 describe("buildPrompt", () => {
   const priceList: PriceListItem[] = [
     { label: "Fliesen verlegen", unit: "m²", unitPriceCents: 4500, category: "Bodenbelag" },
@@ -146,6 +194,27 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("asbestos");
     expect(prompt).toContain("weg_approval");
     expect(prompt).toContain("denkmalschutz");
+  });
+
+  it("includes the job description and price list for a description missing a critical quantity", () => {
+    const description = "Badezimmer neu fliesen"; // no square meterage given
+    const prompt = buildPrompt(description, priceList);
+    expect(prompt).toContain(description);
+    expect(prompt).toContain("Fliesen verlegen");
+    expect(prompt).toContain("45.00 EUR / m²");
+  });
+
+  it("includes the job description and price list for a complete description", () => {
+    const description = "12 m² Badezimmer fliesen mit Fliesen verlegen, weiße Fliesen 20x20cm";
+    const prompt = buildPrompt(description, priceList);
+    expect(prompt).toContain(description);
+    expect(prompt).toContain("Fliesen verlegen");
+  });
+
+  it("always instructs the model to prefer a complete draft and cap questions at 3", () => {
+    const prompt = buildPrompt("Irgendein Auftrag", priceList);
+    expect(prompt).toContain("Prefer producing a complete draft with reasonable assumptions");
+    expect(prompt).toContain("at most 3");
   });
 });
 
@@ -187,6 +256,7 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
 
     expect(result.riskFlags).toHaveLength(1);
     expect(result.riskFlags[0].type).toBe("asbestos");
+    expect(result.clarifyingQuestions).toEqual([]);
   });
 
   it("surfaces a weg_approval flag for facade work in a multi-unit building", async () => {
@@ -226,5 +296,25 @@ describe("generateLineItems risk-flag scenarios (issue #193, mocked AI client)",
     );
 
     expect(result.riskFlags).toEqual([]);
+  });
+
+  it("surfaces both risk flags and clarifying questions from a single call", async () => {
+    mockToolResponse({
+      lineItems: [
+        { description: "Alten Bodenbelag entfernen", quantity: 10, unit: "m²", unitPriceCents: 1500 },
+      ],
+      riskFlags: [
+        { type: "asbestos", message: "Baujahr vor 1993, Bodenbelag wird entfernt." },
+      ],
+      clarifyingQuestions: ["Wie viele Quadratmeter genau?"],
+    });
+
+    const result = await generateLineItems(
+      "Altbau vor 1993, Bodenbelag im Flur entfernen, Fläche unklar.",
+      priceList,
+    );
+
+    expect(result.riskFlags).toHaveLength(1);
+    expect(result.clarifyingQuestions).toEqual(["Wie viele Quadratmeter genau?"]);
   });
 });

@@ -16,6 +16,7 @@ import { ScheduleSection } from "./ScheduleSection";
 import { CommentsSection } from "./CommentsSection";
 import { DepositSection } from "./DepositSection";
 import { RiskFlagsNotice, type RiskFlag } from "./RiskFlagsNotice";
+import { ClarifyingQuestionsSection } from "./ClarifyingQuestionsSection";
 import type { QuoteCommentRow } from "./actions";
 
 type LineItem = {
@@ -48,6 +49,8 @@ type Quote = {
   deposit_paid_at: string | null;
   ai_risk_flags: RiskFlag[] | null;
   ai_risk_flags_acknowledged_at: string | null;
+  ai_clarifying_questions: string[] | null;
+  ai_clarifying_questions_resolved_at: string | null;
 };
 
 type Member = {
@@ -270,6 +273,16 @@ export function QuoteEditor({
         </span>
       </div>
       <p className="text-[#64748b]">{quote.customer_description}</p>
+
+      {quote.ai_clarifying_questions &&
+        quote.ai_clarifying_questions.length > 0 &&
+        !quote.ai_clarifying_questions_resolved_at && (
+          <ClarifyingQuestionsSection
+            quoteId={quote.id}
+            questions={quote.ai_clarifying_questions}
+          />
+        )}
+
       {quote.declined_at && (
         <p className="rounded-xl border border-[#fecaca] bg-red-50 px-4 py-2 text-sm text-[#b91c1c]">
           Vom Kunden abgelehnt.{quote.decline_reason ? ` Grund: ${quote.decline_reason}` : ""}
