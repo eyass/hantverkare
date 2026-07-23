@@ -14,6 +14,7 @@ import { PhotosSection } from "./PhotosSection";
 import { GallerySection } from "./GallerySection";
 import { ScheduleSection } from "./ScheduleSection";
 import { CommentsSection } from "./CommentsSection";
+import { DepositSection } from "./DepositSection";
 import type { QuoteCommentRow } from "./actions";
 
 type LineItem = {
@@ -41,6 +42,9 @@ type Quote = {
   declined_at: string | null;
   decline_reason: string | null;
   assigned_to: string | null;
+  deposit_percent: number | null;
+  deposit_amount_cents: number | null;
+  deposit_paid_at: string | null;
 };
 
 type Member = {
@@ -56,6 +60,8 @@ type Invoice = {
   subtotal_cents: number;
   vat_cents: number;
   total_cents: number;
+  payment_status: "unpaid" | "partial" | "paid";
+  amount_paid_cents: number;
 };
 
 type Photo = {
@@ -117,6 +123,7 @@ export function QuoteEditor({
   quote,
   lineItems,
   invoice,
+  connectOnboarded,
   contract,
   photos,
   warranty,
@@ -129,6 +136,7 @@ export function QuoteEditor({
   quote: Quote;
   lineItems: LineItem[];
   invoice: Invoice | null;
+  connectOnboarded: boolean;
   contract: Contract | null;
   photos: Photo[];
   warranty: WarrantyRecord | null;
@@ -481,6 +489,15 @@ export function QuoteEditor({
             )}
           </div>
 
+          <DepositSection
+            quoteId={quote.id}
+            status={status}
+            totalCents={totals.totalCents}
+            depositPercent={quote.deposit_percent}
+            depositAmountCents={quote.deposit_amount_cents}
+            depositPaidAt={quote.deposit_paid_at}
+          />
+
           {isDraft && (
             <button
               onClick={handleFinalize}
@@ -511,7 +528,9 @@ export function QuoteEditor({
             Als PDF herunterladen
           </a>
 
-          {status === "signed" && <InvoiceSection quoteId={quote.id} invoice={invoice} />}
+          {status === "signed" && (
+            <InvoiceSection quoteId={quote.id} invoice={invoice} connectOnboarded={connectOnboarded} />
+          )}
           {status === "signed" && <WarrantySection warranty={warranty} />}
 
           {status === "signed" && <ContractSection quoteId={quote.id} contract={contract} />}

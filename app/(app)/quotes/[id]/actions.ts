@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { syncInvoiceToLexoffice } from "@/lib/integrations/lexoffice/sync";
+import { createInvoiceCheckoutSession } from "@/lib/stripe/connect";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
@@ -128,6 +131,8 @@ type InvoiceRow = {
   subtotal_cents: number;
   vat_cents: number;
   total_cents: number;
+  payment_status: "unpaid" | "partial" | "paid";
+  amount_paid_cents: number;
 };
 
 type CreateInvoiceResult =
@@ -160,7 +165,7 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
 
   const { data: existingInvoice } = await supabase
     .from("invoices")
-    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, payment_status, amount_paid_cents")
     .eq("quote_id", quoteId)
     .maybeSingle();
   if (existingInvoice) {
@@ -184,7 +189,7 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
       vat_cents: quote.vat_cents,
       total_cents: quote.total_cents,
     })
-    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+    .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, payment_status, amount_paid_cents")
     .single();
 
   if (insertError) {
@@ -193,7 +198,7 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
     // now-existing invoice instead of surfacing an error.
     const { data: raceWinner } = await supabase
       .from("invoices")
-      .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents")
+      .select("id, invoice_number, issued_at, subtotal_cents, vat_cents, total_cents, payment_status, amount_paid_cents")
       .eq("quote_id", quoteId)
       .maybeSingle();
     if (raceWinner) {
@@ -203,7 +208,92 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
     return { error: "Rechnung konnte nicht erstellt werden." };
   }
 
+  // Best-effort lexoffice push (issue #165): uses the service-role admin
+  // client since it needs organizations.lexoffice_api_key, which is never
+  // exposed via a client-scoped select. Never awaited-into-failure -- the
+  // invoice above is already committed and returned to the caller regardless
+  // of what happens here; syncInvoiceToLexoffice swallows all its own errors.
+  await syncInvoiceToLexoffice(createAdminClient(), invoice.id);
+
   return { error: null, invoice };
+}
+
+type CreatePaymentSessionResult = { error: string | null; checkoutUrl?: string };
+
+/**
+ * Creates a Stripe Checkout Session ON THE ORGANIZATION'S CONNECTED ACCOUNT
+ * for an invoice's full total (issue #131 -- customer payment collection,
+ * NOT the SaaS-subscription checkout in app/(app)/billing/actions.ts).
+ *
+ * Requires the org to have finished Stripe Connect onboarding
+ * (stripe_connect_onboarded), otherwise there is no connected account to
+ * create the session against. Uses the admin client for the write (same
+ * "no client-writable surface" reasoning as updateTeamPermissions) but reads
+ * org/invoice state through the caller's RLS-scoped client first.
+ */
+export async function createInvoicePaymentSession(
+  quoteId: string,
+  invoiceId: string,
+): Promise<CreatePaymentSessionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: orgRow } = await supabase
+    .from("organizations")
+    .select("stripe_connect_account_id, stripe_connect_onboarded")
+    .eq("id", org.organizationId)
+    .maybeSingle();
+  if (!orgRow?.stripe_connect_onboarded || !orgRow.stripe_connect_account_id) {
+    return { error: "Zahlungen sind noch nicht eingerichtet (Stripe verbinden)." };
+  }
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, total_cents, payment_status, organization_id")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (!invoice || invoice.organization_id !== org.organizationId) {
+    return { error: "Rechnung nicht gefunden." };
+  }
+  if (invoice.payment_status === "paid") {
+    return { error: "Rechnung ist bereits bezahlt." };
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const session = await createInvoiceCheckoutSession({
+    connectedAccountId: orgRow.stripe_connect_account_id,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoice_number,
+    totalCents: invoice.total_cents,
+    successUrl: `${siteUrl}/quotes/${quoteId}?payment=success`,
+    cancelUrl: `${siteUrl}/quotes/${quoteId}?payment=cancelled`,
+  });
+
+  if (!session.url) {
+    return { error: "Stripe konnte keine Checkout-Sitzung erstellen." };
+  }
+
+  const admin = createAdminClient();
+  const { error: updateError } = await admin
+    .from("invoices")
+    .update({ stripe_checkout_session_id: session.id })
+    .eq("id", invoice.id);
+  if (updateError) {
+    console.error("Failed to persist checkout session id:", updateError);
+  }
+
+  return { error: null, checkoutUrl: session.url };
 }
 
 export async function finalizeQuote(quoteId: string): Promise<{ error: string | null }> {
@@ -225,6 +315,66 @@ export async function finalizeQuote(quoteId: string): Promise<{ error: string | 
     return { error: "Angebot ist bereits final." };
   }
 
+  return { error: null };
+}
+
+/**
+ * Configures (or clears) the deposit percentage a customer will be asked to
+ * pay at signing time (issue #162). Allowed any time before the quote is
+ * signed -- draft or final -- since the tradesperson may want to add a
+ * deposit requirement right up until the customer actually confirms. Once a
+ * quote is signed the amount is locked in (snapshotted onto
+ * deposit_amount_cents by the sign flow in app/q/[token]/actions.ts), so
+ * changing the percentage afterwards would be misleading and is rejected.
+ *
+ * The actual Stripe Checkout Session is only ever created later, at signing
+ * time -- see lib/payments/createDepositCheckoutSession.ts -- this action
+ * only stores the tradesperson's chosen percentage.
+ */
+export async function setDepositPercent(
+  quoteId: string,
+  percent: number | null,
+): Promise<{ error: string | null }> {
+  if (percent !== null && (!Number.isInteger(percent) || percent < 1 || percent > 100)) {
+    return { error: "Anzahlung muss zwischen 1 und 100 Prozent liegen." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id, status")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status === "signed" || quote.status === "declined") {
+    return { error: "Anzahlung kann nach Unterschrift nicht mehr geändert werden." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({ deposit_percent: percent })
+    .eq("id", quoteId);
+  if (updateError) {
+    console.error("Failed to set deposit percent:", updateError);
+    return { error: "Anzahlung konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
   return { error: null };
 }
 

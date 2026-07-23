@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SignForm } from "./SignForm";
 import { DeclineForm } from "./DeclineForm";
 import { CommentsThread } from "./CommentsThread";
+import { DepositPayPrompt } from "./DepositPayPrompt";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -19,7 +20,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .select(
-      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name, declined_at, decline_reason",
+      "id, customer_description, status, subtotal_cents, vat_cents, total_cents, signed_at, signer_name, declined_at, decline_reason, deposit_percent, deposit_amount_cents, deposit_paid_at",
     )
     .eq("share_token", token)
     .single();
@@ -118,6 +119,22 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
           <div className="rounded-2xl bg-[#dcfce7] p-6 text-center">
             <p className="text-sm font-medium text-[#16a34a]">
               Signiert am {quote.signed_at ? formatDate(quote.signed_at) : "-"} von {quote.signer_name ?? "-"}.
+            </p>
+          </div>
+        )}
+
+        {quote.status === "signed" && !quote.declined_at && quote.deposit_percent && !quote.deposit_paid_at && (
+          <DepositPayPrompt
+            token={token}
+            depositPercent={quote.deposit_percent}
+            depositAmountCents={quote.deposit_amount_cents}
+          />
+        )}
+
+        {quote.status === "signed" && !quote.declined_at && quote.deposit_percent && quote.deposit_paid_at && (
+          <div className="rounded-2xl bg-[#dcfce7] p-4 text-center">
+            <p className="text-sm font-medium text-[#16a34a]">
+              Anzahlung von {quote.deposit_percent}% erhalten am {formatDate(quote.deposit_paid_at)}.
             </p>
           </div>
         )}

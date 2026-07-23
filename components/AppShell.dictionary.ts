@@ -13,6 +13,7 @@ export type AppShellCopy = {
     reports: string;
     settings: string;
     team: string;
+    integrations: string;
     dangerZone: string;
   };
   navGroups: {
@@ -45,6 +46,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       reports: "Berichte",
       settings: "Einstellungen",
       team: "Team",
+      integrations: "Integrationen",
       dangerZone: "Gefahrenzone",
     },
     navGroups: {
@@ -73,6 +75,7 @@ export const APP_SHELL_DICTIONARY: Dictionary<AppShellCopy> = {
       reports: "Reports",
       settings: "Settings",
       team: "Team",
+      integrations: "Integrations",
       dangerZone: "Danger zone",
     },
     navGroups: {

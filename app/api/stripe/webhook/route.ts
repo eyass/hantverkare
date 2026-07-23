@@ -103,6 +103,40 @@ export async function POST(request: Request): Promise<Response> {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
+
+      // Deposit (Anzahlung) checkout sessions, issue #162 -- created by
+      // lib/payments/createDepositCheckoutSession.ts on the org's connected
+      // Stripe Connect account (issue #131), always tagged with
+      // metadata.kind so they're never confused with the SaaS subscription
+      // checkout sessions handled below. Matches on
+      // deposit_stripe_checkout_session_id (not just quote_id) so a stale,
+      // already-superseded session (the customer re-requested a payment
+      // link) can never retroactively mark the quote paid.
+      if (session.metadata?.kind === "deposit_checkout") {
+        const quoteId = session.metadata.quote_id;
+        if (!quoteId) {
+          console.error("Deposit checkout session completed with no quote_id metadata:", session.id);
+          break;
+        }
+        const supabase = createAdminClient();
+        const { error, data } = await supabase
+          .from("quotes")
+          .update({ deposit_paid_at: new Date().toISOString() })
+          .eq("id", quoteId)
+          .eq("deposit_stripe_checkout_session_id", session.id)
+          .is("deposit_paid_at", null)
+          .select("id");
+        if (error) {
+          console.error("Failed to mark deposit as paid from webhook:", error);
+        } else if (!data || data.length === 0) {
+          console.log(
+            "Deposit checkout session completed but no matching unpaid quote found (already paid, or session was superseded):",
+            session.id,
+          );
+        }
+        break;
+      }
+
       const supabase = createAdminClient();
       // client_reference_id now carries the organization_id (set in
       // createCheckoutSession); metadata.organization_id is the primary source,
