@@ -101,6 +101,7 @@ export async function generateQuoteDraft(
     quantityReasoning: item.quantityReasoning,
     confidence: item.confidence,
     priceListItemId: item.priceListItemId,
+    groupLabel: item.groupLabel,
   }));
   const totals = computeTotals(pricedItems);
 
@@ -154,6 +155,9 @@ export async function generateQuoteDraft(
       item_type: item.itemType,
       quantity_reasoning: item.quantityReasoning,
       confidence: item.confidence,
+      // Optional room/trade/phase label (issue #205) -- null for the
+      // common single-room/single-phase job.
+      group_label: item.groupLabel,
     })),
   );
   if (lineItemsError) {

@@ -31,6 +31,11 @@ type UpdateLineItemInput = {
   unit: string;
   unitPriceCents: number;
   costCents?: number | null;
+  // Reassigning/renaming/ungrouping a line item's room/trade/phase (issue
+  // #205) is just updating this one row's group_label -- there's no
+  // separate group entity to manage. undefined leaves the existing value
+  // untouched; null (or an empty string) clears it.
+  groupLabel?: string | null;
 };
 
 type LineItemRow = {
@@ -42,6 +47,7 @@ type LineItemRow = {
   cost_cents: number | null;
   line_total_cents: number;
   position: number;
+  group_label?: string | null;
 };
 
 type UpdateLineItemResult =
@@ -83,16 +89,22 @@ export async function updateLineItem(
     unitPriceCents: input.unitPriceCents,
   });
 
+  const updatePayload: Record<string, unknown> = {
+    description: priced.description,
+    quantity: priced.quantity,
+    unit: priced.unit,
+    unit_price_cents: priced.unitPriceCents,
+    cost_cents: costCents,
+    line_total_cents: priced.lineTotalCents,
+  };
+  if (input.groupLabel !== undefined) {
+    const trimmed = input.groupLabel?.trim() ?? "";
+    updatePayload.group_label = trimmed.length > 0 ? trimmed : null;
+  }
+
   const { error: updateError } = await supabase
     .from("quote_line_items")
-    .update({
-      description: priced.description,
-      quantity: priced.quantity,
-      unit: priced.unit,
-      unit_price_cents: priced.unitPriceCents,
-      cost_cents: costCents,
-      line_total_cents: priced.lineTotalCents,
-    })
+    .update(updatePayload)
     .eq("id", lineItemId)
     .eq("quote_id", quoteId);
   if (updateError) {
@@ -102,7 +114,7 @@ export async function updateLineItem(
   const { data: allItems, error: fetchError } = await supabase
     .from("quote_line_items")
     .select(
-      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning",
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, group_label",
     )
     .eq("quote_id", quoteId)
     .order("position");
@@ -692,6 +704,7 @@ export async function regenerateQuoteDraft(
     quantityReasoning: item.quantityReasoning,
     confidence: item.confidence,
     priceListItemId: item.priceListItemId,
+    groupLabel: item.groupLabel,
   }));
   const totals = computeTotals(pricedItems);
 
@@ -751,10 +764,11 @@ export async function regenerateQuoteDraft(
         item_type: item.itemType,
         quantity_reasoning: item.quantityReasoning,
         confidence: item.confidence,
+        group_label: item.groupLabel,
       })),
     )
     .select(
-      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, confidence",
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, confidence, group_label",
     );
   if (insertError || !insertedItems) {
     console.error("Failed to insert regenerated line items:", insertError);
@@ -1292,7 +1306,7 @@ export async function addSuggestedLineItem(
   const { data: allItems, error: fetchError } = await supabase
     .from("quote_line_items")
     .select(
-      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning",
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, group_label",
     )
     .eq("quote_id", quoteId)
     .order("position");

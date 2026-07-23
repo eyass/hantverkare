@@ -48,6 +48,9 @@ export type GeneratedLineItem = LineItem & {
   quantityReasoning: string;
   confidence: ConfidenceLevel;
   priceListItemId: string | null;
+  // Optional room/trade/phase label (issue #205) -- see
+  // GROUPING_INSTRUCTIONS below. Null for the common single-group case.
+  groupLabel: string | null;
 };
 
 export type GenerateLineItemsResult = {
@@ -110,6 +113,13 @@ const LINE_ITEMS_TOOL = {
               type: "string" as const,
               description:
                 "Only required alongside a custom item (priceListItemId omitted) -- the unit of measure, e.g. 'Stunde', 'm²', 'Stück'.",
+            },
+            groupLabel: {
+              type: "string" as const,
+              description:
+                "Only when the job description clearly spans multiple distinct rooms/areas/phases: a short label " +
+                "(in the tradesperson's own vocabulary, e.g. 'Küche', 'Bad', 'Vorbereitung') for which room/area/" +
+                "phase this line item belongs to. Omit entirely for the common single-room/single-phase job.",
             },
           },
           required: ["quantity", "itemType", "quantityReasoning", "confidence"],
@@ -246,6 +256,16 @@ function resolveLineItem(
   }
   const confidence = item.confidence as ConfidenceLevel;
 
+  // Optional room/trade/phase label (issue #205) -- same "absent means the
+  // common case" validation style as unit/customDescription above: reject a
+  // non-string value outright (malformed input), but treat an absent field
+  // as simply ungrouped rather than an error.
+  if (item.groupLabel !== undefined && typeof item.groupLabel !== "string") {
+    throw new QuoteGenerationError(`Invalid groupLabel at index ${index}`);
+  }
+  const trimmedGroupLabel = typeof item.groupLabel === "string" ? item.groupLabel.trim() : "";
+  const groupLabel = trimmedGroupLabel.length > 0 ? trimmedGroupLabel : null;
+
   const hasPriceListItemId = typeof item.priceListItemId === "string" && item.priceListItemId.length > 0;
   const hasCustom =
     typeof item.customUnitPriceCents === "number" && typeof item.customDescription === "string";
@@ -274,6 +294,7 @@ function resolveLineItem(
       quantityReasoning: (item.quantityReasoning as string).trim(),
       confidence,
       priceListItemId: priceListItem.id,
+      groupLabel,
     };
   }
 
@@ -304,6 +325,7 @@ function resolveLineItem(
     quantityReasoning: (item.quantityReasoning as string).trim(),
     confidence,
     priceListItemId: null,
+    groupLabel,
   };
 }
 
@@ -366,6 +388,16 @@ const AUXILIARY_COST_INSTRUCTIONS = `Additionally, always evaluate whether these
 
 For each one that applies, prefer matching it to a real price list entry (this Handwerker's price list may already contain an "Anfahrt"-style entry -- check the price list below the same way as any other line item) before falling back to a custom item with a clearly-reasoned estimate in quantityReasoning.`;
 
+// Multi-room / multi-phase grouping (issue #205) -- same "don't manufacture
+// structure where none is needed" principle already used for
+// clarifyingQuestions (#194) and riskFlags (#193): only assign a
+// groupLabel when the job description clearly spans multiple distinct
+// rooms/areas/phases. The common single-room/single-phase job should leave
+// every item's groupLabel unset, so most quotes stay ungrouped and
+// visually simple (see lib/quotes/groupLineItems.ts -- an ungrouped quote
+// renders byte-identical to today's flat list).
+const GROUPING_INSTRUCTIONS = `Additionally, decide whether this job clearly spans multiple distinct rooms/areas/phases (e.g. "Küche" and "Bad" as two separate areas, or "Vorbereitung"/"Ausführung"/"Reinigung" as distinct phases). If -- and only if -- it does, set "groupLabel" on each line item to the short label (in the tradesperson's own vocabulary) for the room/area/phase it belongs to, so the draft can be shown clustered by area. For the common single-room, single-phase job, leave "groupLabel" unset on every line item -- do not invent a group for a job that's really just one undifferentiated piece of work.`;
+
 export function buildPrompt(
   description: string,
   priceList: PriceListItem[],
@@ -407,7 +439,9 @@ ${description}
 
 ${RISK_FLAG_INSTRUCTIONS}
 
-${AUXILIARY_COST_INSTRUCTIONS}`;
+${AUXILIARY_COST_INSTRUCTIONS}
+
+${GROUPING_INSTRUCTIONS}`;
 }
 
 export async function generateLineItems(

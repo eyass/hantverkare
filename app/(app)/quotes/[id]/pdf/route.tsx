@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("quote_line_items")
-    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position")
+    .select("id, description, quantity, unit, unit_price_cents, line_total_cents, position, group_label")
     .eq("quote_id", id)
     .order("position");
 
