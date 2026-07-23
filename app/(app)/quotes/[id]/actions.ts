@@ -6,7 +6,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { syncInvoiceToLexoffice } from "@/lib/integrations/lexoffice/sync";
 import { createInvoiceCheckoutSession } from "@/lib/stripe/connect";
-import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
+import {
+  priceLineItem,
+  computeTotals,
+  adjustUnitPriceCents,
+  isValidBulkAdjustPercent,
+  MIN_BULK_ADJUST_PERCENT,
+  MAX_BULK_ADJUST_PERCENT,
+} from "@/lib/quotes/pricing";
+import { resolveManualLineItem, ManualLineItemError } from "@/lib/quotes/resolveManualLineItem";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
 import {
   generateLineItems,
@@ -1301,6 +1309,271 @@ export async function addSuggestedLineItem(
   if (insertError) {
     console.error("Failed to add suggested line item:", insertError);
     return { error: "Position konnte nicht hinzugefügt werden." };
+  }
+
+  const { data: allItems, error: fetchError } = await supabase
+    .from("quote_line_items")
+    .select(
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, group_label",
+    )
+    .eq("quote_id", quoteId)
+    .order("position");
+  if (fetchError || !allItems) {
+    return { error: "Positionen konnten nicht geladen werden." };
+  }
+
+  const totals = computeTotals(
+    allItems.map((item) => ({
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPriceCents: item.unit_price_cents,
+      lineTotalCents: item.line_total_cents,
+    })),
+  );
+
+  const { error: totalsError } = await supabase
+    .from("quotes")
+    .update({
+      subtotal_cents: totals.subtotalCents,
+      vat_cents: totals.vatCents,
+      total_cents: totals.totalCents,
+    })
+    .eq("id", quoteId);
+  if (totalsError) {
+    return { error: "Summen konnten nicht aktualisiert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null, lineItems: allItems, totals };
+}
+
+const MAX_MANUAL_DESCRIPTION_LENGTH = 200;
+
+type AddManualLineItemResult =
+  | { error: string; lineItems?: never; totals?: never }
+  | {
+      error: null;
+      lineItems: LineItemRow[];
+      totals: { subtotalCents: number; vatCents: number; totalCents: number };
+    };
+
+/**
+ * "Weitere Position hinzufügen" (manual AI-assisted quick-add): resolves a
+ * short free-text description into one additional line item via a small,
+ * focused Anthropic call (lib/quotes/resolveManualLineItem.ts), then inserts
+ * it and recomputes totals -- same draft-only guard, position, and return
+ * shape as addSuggestedLineItem above so the client-side state update code
+ * doesn't need a new branch. Trust boundary is identical to the initial AI
+ * draft (issue #200): when the model matches an existing price list item,
+ * description/unit/unitPriceCents are read from that server-side row, never
+ * from anything the model echoed back.
+ */
+export async function addManualLineItem(
+  quoteId: string,
+  description: string,
+): Promise<AddManualLineItemResult> {
+  const trimmed = description.trim();
+  if (trimmed.length === 0) {
+    return { error: "Bitte beschreibe die Position." };
+  }
+  if (trimmed.length > MAX_MANUAL_DESCRIPTION_LENGTH) {
+    return { error: `Die Beschreibung ist zu lang (max. ${MAX_MANUAL_DESCRIPTION_LENGTH} Zeichen).` };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, status, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status !== "draft") {
+    return { error: "Angebot ist bereits final und kann nicht mehr bearbeitet werden." };
+  }
+
+  const { data: priceList, error: priceListError } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit, unit_price_cents, category");
+  if (priceListError || !priceList) {
+    console.error("Failed to load price list:", priceListError);
+    return { error: "Preisliste konnte nicht geladen werden." };
+  }
+
+  let resolved;
+  try {
+    resolved = await resolveManualLineItem(
+      trimmed,
+      priceList.map((p) => ({
+        id: p.id,
+        label: p.label,
+        unit: p.unit,
+        unitPriceCents: p.unit_price_cents,
+        category: p.category,
+      })),
+    );
+  } catch (err) {
+    if (err instanceof ManualLineItemError) {
+      console.error("Manual line item resolution failed:", err);
+      return { error: `Position konnte nicht ermittelt werden: ${err.message}` };
+    }
+    throw err;
+  }
+
+  const { data: existingItems } = await supabase
+    .from("quote_line_items")
+    .select("position")
+    .eq("quote_id", quoteId)
+    .order("position", { ascending: false })
+    .limit(1);
+  const nextPosition = (existingItems?.[0]?.position ?? -1) + 1;
+
+  const priced = priceLineItem(resolved);
+
+  const { error: insertError } = await supabase.from("quote_line_items").insert({
+    quote_id: quoteId,
+    description: priced.description,
+    quantity: priced.quantity,
+    unit: priced.unit,
+    unit_price_cents: priced.unitPriceCents,
+    line_total_cents: priced.lineTotalCents,
+    position: nextPosition,
+    organization_id: org.organizationId,
+    user_id: user.id,
+    price_list_item_id: resolved.priceListItemId,
+  });
+  if (insertError) {
+    console.error("Failed to add manual line item:", insertError);
+    return { error: "Position konnte nicht hinzugefügt werden." };
+  }
+
+  const { data: allItems, error: fetchError } = await supabase
+    .from("quote_line_items")
+    .select(
+      "id, description, quantity, unit, unit_price_cents, cost_cents, line_total_cents, position, item_type, quantity_reasoning, group_label",
+    )
+    .eq("quote_id", quoteId)
+    .order("position");
+  if (fetchError || !allItems) {
+    return { error: "Positionen konnten nicht geladen werden." };
+  }
+
+  const totals = computeTotals(
+    allItems.map((item) => ({
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPriceCents: item.unit_price_cents,
+      lineTotalCents: item.line_total_cents,
+    })),
+  );
+
+  const { error: totalsError } = await supabase
+    .from("quotes")
+    .update({
+      subtotal_cents: totals.subtotalCents,
+      vat_cents: totals.vatCents,
+      total_cents: totals.totalCents,
+    })
+    .eq("id", quoteId);
+  if (totalsError) {
+    return { error: "Summen konnten nicht aktualisiert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null, lineItems: allItems, totals };
+}
+
+type BulkAdjustLineItemPricesResult =
+  | { error: string; lineItems?: never; totals?: never }
+  | {
+      error: null;
+      lineItems: LineItemRow[];
+      totals: { subtotalCents: number; vatCents: number; totalCents: number };
+    };
+
+/**
+ * "Alle Preise anpassen": applies a single percentage adjustment (positive
+ * to increase, negative to decrease) to every line item's unit_price_cents
+ * on a draft quote, rounding each resulting price to the nearest cent (see
+ * adjustUnitPriceCents in lib/quotes/pricing.ts), then recomputes and
+ * persists totals. Guarded the same way updateLineItem is (status === draft)
+ * plus a sane percent bound to prevent a fat-finger entry from silently
+ * corrupting every price on the quote at once.
+ */
+export async function bulkAdjustLineItemPrices(
+  quoteId: string,
+  percent: number,
+): Promise<BulkAdjustLineItemPricesResult> {
+  if (!isValidBulkAdjustPercent(percent)) {
+    return {
+      error: `Prozentsatz muss zwischen ${MIN_BULK_ADJUST_PERCENT}% und ${MAX_BULK_ADJUST_PERCENT}% liegen (und ungleich 0).`,
+    };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, status, organization_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status !== "draft") {
+    return { error: "Angebot ist bereits final und kann nicht mehr bearbeitet werden." };
+  }
+
+  const { data: existingItems, error: fetchExistingError } = await supabase
+    .from("quote_line_items")
+    .select("id, quantity, unit_price_cents")
+    .eq("quote_id", quoteId);
+  if (fetchExistingError || !existingItems) {
+    return { error: "Positionen konnten nicht geladen werden." };
+  }
+
+  for (const item of existingItems) {
+    const nextUnitPriceCents = adjustUnitPriceCents(item.unit_price_cents, percent);
+    const { error: updateError } = await supabase
+      .from("quote_line_items")
+      .update({
+        unit_price_cents: nextUnitPriceCents,
+        line_total_cents: Math.round(item.quantity * nextUnitPriceCents),
+      })
+      .eq("id", item.id)
+      .eq("quote_id", quoteId);
+    if (updateError) {
+      console.error("Failed to bulk-adjust line item price:", updateError);
+      return { error: "Preise konnten nicht angepasst werden." };
+    }
   }
 
   const { data: allItems, error: fetchError } = await supabase
