@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
 import { buildRowsToInsert, type Selection } from "@/lib/priceList/templateSelection";
 import { parsePriceListImport, type ParsedPriceListRow, type PriceListRowError } from "@/lib/priceList/importPriceList";
+import { buildSupplierPriceDiff, type SupplierPriceDiff } from "@/lib/priceList/supplierPriceDiff";
 
 export type PriceListItemInput = {
   label: string;
@@ -413,4 +414,142 @@ export async function commitPriceListImport(csvText: string): Promise<PriceListI
   }
 
   return { error: null, updated: rowsToUpdate.length, created: rowsToInsert.length };
+}
+
+export type SupplierPriceUpdatePreviewResult =
+  | { error: string; diff?: never; errors?: never }
+  | { error: null; diff: SupplierPriceDiff; errors: PriceListRowError[] };
+
+/**
+ * Preview step for a "supplier sent me a new price list" update (issue
+ * #167). Reuses the exact same CSV parsing/validation as the plain
+ * re-import (parsePriceListImport), but instead of returning raw valid rows
+ * for the caller to blindly commit, it matches each row against the org's
+ * current price-list items (by label, case-insensitive) and returns a diff
+ * -- old price vs new price per matched item, plus a separate list of rows
+ * that don't match anything yet -- so the owner can review exactly what's
+ * about to change before anything is written, rather than a silent
+ * overwrite.
+ */
+export async function previewSupplierPriceUpdate(csvText: string): Promise<SupplierPriceUpdatePreviewResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  if (csvText.trim().length === 0) {
+    return { error: "Die Datei ist leer." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { validRows, errors } = parsePriceListImport(csvText);
+  if (validRows.length === 0 && errors.length === 0) {
+    return { error: "Die Datei enthält keine Preislisten-Daten." };
+  }
+
+  const { data: existingItems, error: fetchError } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit_price_cents")
+    .eq("organization_id", org.organizationId);
+  if (fetchError) {
+    console.error("Failed to load existing price list items for supplier price update:", fetchError);
+    return { error: "Preisliste konnte nicht geladen werden." };
+  }
+
+  const diff = buildSupplierPriceDiff(existingItems ?? [], validRows);
+
+  return { error: null, diff, errors };
+}
+
+export type SupplierPriceUpdateCommitResult =
+  | { error: string; updated?: never; created?: never; unchanged?: never }
+  | { error: null; updated: number; created: number; unchanged: number };
+
+/**
+ * Commits a previously previewed supplier price update: re-parses the raw
+ * CSV text and re-computes the diff server-side (never trusts a
+ * client-supplied diff, same trust-boundary pattern as
+ * commitPriceListImport) so the rows actually written always match what a
+ * fresh preview of this exact file would show. Only matched rows whose
+ * price actually changed are written -- unchanged matches are left alone
+ * to avoid pointless writes -- and unmatched rows (new materials the
+ * supplier introduced) are inserted as new price-list items.
+ */
+export async function commitSupplierPriceUpdate(csvText: string): Promise<SupplierPriceUpdateCommitResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { validRows } = parsePriceListImport(csvText);
+  if (validRows.length === 0) {
+    return { error: "Keine gültigen Positionen zum Importieren gefunden." };
+  }
+
+  const { data: existingItems, error: fetchError } = await supabase
+    .from("price_list_items")
+    .select("id, label, unit_price_cents")
+    .eq("organization_id", org.organizationId);
+  if (fetchError) {
+    console.error("Failed to load existing price list items for supplier price update:", fetchError);
+    return { error: "Preisliste konnte nicht geladen werden." };
+  }
+
+  const { updates, creates } = buildSupplierPriceDiff(existingItems ?? [], validRows);
+
+  const changedUpdates = updates.filter((row) => row.changed);
+  const unchangedCount = updates.length - changedUpdates.length;
+
+  if (changedUpdates.length > 0) {
+    const { error: updateError } = await supabase
+      .from("price_list_items")
+      .upsert(
+        changedUpdates.map((row) => ({
+          id: row.id,
+          label: row.label,
+          unit: row.unit,
+          unit_price_cents: row.newUnitPriceCents,
+          category: row.category,
+        })),
+        { onConflict: "id" },
+      );
+    if (updateError) {
+      console.error("Failed to apply supplier price update:", updateError);
+      return { error: "Preisupdate fehlgeschlagen. Es wurde nichts gespeichert." };
+    }
+  }
+
+  if (creates.length > 0) {
+    const { error: insertError } = await supabase.from("price_list_items").insert(
+      creates.map((row) => ({
+        label: row.label,
+        unit: row.unit,
+        unit_price_cents: row.unitPriceCents,
+        category: row.category,
+        organization_id: org.organizationId,
+        user_id: user.id,
+      })),
+    );
+    if (insertError) {
+      console.error("Failed to insert new items from supplier price update:", insertError);
+      return { error: "Preisupdate teilweise fehlgeschlagen. Bestehende Preise wurden aktualisiert, neue Positionen konnten nicht angelegt werden." };
+    }
+  }
+
+  return { error: null, updated: changedUpdates.length, created: creates.length, unchanged: unchangedCount };
 }
