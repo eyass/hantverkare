@@ -24,3 +24,15 @@ Assign a tier during SCOPE. It decides which gates apply. When unsure, pick the 
   tier. This does NOT affect the plan gate (T2/T3 still require plan approval during
   SCOPE). See `.harness/LOOP.md`'s SHIP phase for the full note. Revert the moment the
   human asks.
+- **Migration-apply override (in effect until the human says otherwise):** every
+  `supabase/migrations/*.sql` file gets applied directly to the real database via the
+  Supabase MCP connection as part of SHIP, not left as a manual step. See
+  `.harness/LOOP.md`'s "Migrations: apply directly" note for the full checklist.
+
+## Manual-step issues still apply
+The migration-apply override above only covers running the SQL. It does **not** cover other
+manual setup a T3 change might still need — third-party account provisioning (Stripe Connect
+webhook registration, Google Cloud OAuth consent screen, DNS, real Stripe go-live), or
+legal/compliance sign-off (e.g. GoBD/Steuerberater review). Keep filing those as tracked
+"manual-step" issues; only close the migration-tracking half once the schema is actually
+verified live.
