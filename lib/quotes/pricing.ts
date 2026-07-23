@@ -19,3 +19,32 @@ export function computeTotals(items: PricedLineItem[]): QuoteTotals {
   const totalCents = subtotalCents + vatCents;
   return { subtotalCents, vatCents, totalCents };
 }
+
+// Guard rails for bulk price adjustment (issue: bulk price adjustment) --
+// -90% floors a price near zero without hitting it (a price can never go to
+// or below 0, since every line item must have a positive unit price), and
+// +200% is generous enough for legitimate re-pricing (e.g. doubling or
+// tripling an old price list) while still catching an obvious fat-finger
+// entry like "2000" meant as "20".
+export const MIN_BULK_ADJUST_PERCENT = -90;
+export const MAX_BULK_ADJUST_PERCENT = 200;
+
+export function isValidBulkAdjustPercent(percent: number): boolean {
+  return (
+    Number.isFinite(percent) &&
+    percent !== 0 &&
+    percent >= MIN_BULK_ADJUST_PERCENT &&
+    percent <= MAX_BULK_ADJUST_PERCENT
+  );
+}
+
+/**
+ * Applies a bulk percentage adjustment to a single unit price, rounding the
+ * result to the nearest cent. Positive percent increases the price, negative
+ * decreases it. The result is always at least 1 cent -- a bulk decrease can
+ * never zero out or invert a price.
+ */
+export function adjustUnitPriceCents(unitPriceCents: number, percent: number): number {
+  const adjusted = Math.round(unitPriceCents * (1 + percent / 100));
+  return Math.max(1, adjusted);
+}

@@ -1,7 +1,14 @@
 "use client";
 
 import { Fragment, useMemo, useState, useTransition } from "react";
-import { updateLineItem, finalizeQuote, assignQuote, addSuggestedLineItem } from "./actions";
+import {
+  updateLineItem,
+  finalizeQuote,
+  assignQuote,
+  addSuggestedLineItem,
+  addManualLineItem,
+  bulkAdjustLineItemPrices,
+} from "./actions";
 import { groupLineItems } from "@/lib/quotes/groupLineItems";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
@@ -179,6 +186,10 @@ export function QuoteEditor({
   const [isAssignPending, startAssignTransition] = useTransition();
   const [suggestions, setSuggestions] = useState(upsellSuggestions);
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null);
+  const [manualDescription, setManualDescription] = useState("");
+  const [isManualAddPending, startManualAddTransition] = useTransition();
+  const [bulkAdjustPercent, setBulkAdjustPercent] = useState("");
+  const [isBulkAdjustPending, startBulkAdjustTransition] = useTransition();
   const isDraft = status === "draft";
   const displayStatus = computeQuoteDisplayStatus({ status, declinedAt: quote.declined_at });
   const profitability = computeProfitability(
@@ -290,6 +301,45 @@ export function QuoteEditor({
       setLastSavedItems(result.lineItems);
       setTotals(result.totals);
       setSuggestions((prev) => prev.filter((s) => s.priceListItemId !== suggestion.priceListItemId));
+    });
+  }
+
+  function handleAddManualLineItem() {
+    const description = manualDescription.trim();
+    if (description.length === 0) return;
+    startManualAddTransition(async () => {
+      const result = await addManualLineItem(quote.id, description);
+      if (result.error !== null) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setItems(result.lineItems);
+      setLastSavedItems(result.lineItems);
+      setTotals(result.totals);
+      setManualDescription("");
+    });
+  }
+
+  function handleBulkAdjustPrices() {
+    const percent = Number(bulkAdjustPercent);
+    if (!Number.isFinite(percent) || percent === 0) return;
+    const direction = percent > 0 ? "erhöht" : "reduziert";
+    const confirmed = window.confirm(
+      `Alle Einzelpreise um ${Math.abs(percent)}% ${direction}. Fortfahren?`,
+    );
+    if (!confirmed) return;
+    startBulkAdjustTransition(async () => {
+      const result = await bulkAdjustLineItemPrices(quote.id, percent);
+      if (result.error !== null) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setItems(result.lineItems);
+      setLastSavedItems(result.lineItems);
+      setTotals(result.totals);
+      setBulkAdjustPercent("");
     });
   }
 
@@ -598,6 +648,35 @@ export function QuoteEditor({
               </ul>
             </div>
           )}
+          {isDraft && (
+            <div className="flex flex-col gap-2 border-t border-[#e9edf2] px-4 py-4 sm:flex-row sm:items-center">
+              <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+                Weitere Position hinzufügen
+              </span>
+              <input
+                type="text"
+                value={manualDescription}
+                onChange={(e) => setManualDescription(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddManualLineItem();
+                  }
+                }}
+                placeholder="z. B. zusätzlicher Wasserhahn"
+                disabled={isManualAddPending}
+                className="flex-1 rounded-lg border border-[#e9edf2] px-3 py-2 text-sm disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={handleAddManualLineItem}
+                disabled={isManualAddPending || manualDescription.trim().length === 0}
+                className="shrink-0 rounded-full border border-[#2563eb] px-3 py-2 text-xs font-medium text-[#2563eb] transition-colors hover:bg-[#eff6ff] disabled:opacity-50"
+              >
+                {isManualAddPending ? "Wird ermittelt…" : "+ Hinzufügen"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Summary card */}
@@ -616,6 +695,34 @@ export function QuoteEditor({
               <span className="font-mono">{formatEuros(totals.totalCents)}</span>
             </div>
           </div>
+
+          {isDraft && (
+            <div className="flex flex-col gap-2 rounded-xl border border-[#e9edf2] p-4 text-sm">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+                Alle Preise anpassen
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="1"
+                  value={bulkAdjustPercent}
+                  onChange={(e) => setBulkAdjustPercent(e.target.value)}
+                  placeholder="z. B. 10 oder -5"
+                  disabled={isBulkAdjustPending}
+                  className="w-24 rounded-lg border border-[#e9edf2] px-3 py-2 text-sm disabled:opacity-50"
+                />
+                <span className="text-[#64748b]">%</span>
+                <button
+                  type="button"
+                  onClick={handleBulkAdjustPrices}
+                  disabled={isBulkAdjustPending || bulkAdjustPercent.trim().length === 0}
+                  className="shrink-0 rounded-full border border-[#e9edf2] px-3 py-2 text-xs font-medium text-[#0f172a] transition-colors hover:bg-[#f8fafc] disabled:opacity-50"
+                >
+                  {isBulkAdjustPending ? "Wird angepasst…" : "Anwenden"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 rounded-xl border border-[#e9edf2] bg-[#f8fafc] p-4 text-sm">
             <span className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
