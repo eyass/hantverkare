@@ -7,6 +7,8 @@ import {
   type ReconciledInvoice,
 } from "@/lib/invoices/reconciliation";
 import { buildCashFlowForecast, type CashFlowContract, type CashFlowInvoice, type CashFlowQuote } from "@/lib/cash-flow/forecast";
+import { GobdComplianceNotice } from "./GobdComplianceNotice";
+import { CreditNoteForm } from "./CreditNoteForm";
 
 function formatEuros(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -39,12 +41,18 @@ export default async function InvoicesPage() {
   // for the identical pattern).
   const { data: invoiceRows, error } = await supabase
     .from("invoices")
-    .select("id, invoice_number, issued_at, due_date, paid_at, total_cents, quote_id, quotes(customers(name))")
+    .select(
+      "id, invoice_number, issued_at, due_date, paid_at, total_cents, quote_id, voided_at, quotes(customers(name))",
+    )
     .order("issued_at", { ascending: false });
 
   if (error) {
     console.error("Failed to load invoices for reconciliation dashboard:", error);
   }
+
+  const voidedAtById = new Map<string, string | null>(
+    (invoiceRows ?? []).map((row) => [row.id as string, row.voided_at as string | null]),
+  );
 
   const invoices = (invoiceRows ?? []).map((row) => {
     const quote = Array.isArray(row.quotes) ? row.quotes[0] : row.quotes;
@@ -259,8 +267,26 @@ export default async function InvoicesPage() {
         </div>
       </div>
 
+      <GobdComplianceNotice />
+
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium text-[#0f172a]">Rechnungen</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-medium text-[#0f172a]">Rechnungen</h2>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/api/export/invoices"
+              className="rounded-lg border border-[#e9edf2] px-3 py-1.5 text-sm font-medium text-[#0f172a] hover:bg-[#f8fafc]"
+            >
+              CSV-Export
+            </a>
+            <a
+              href="/api/export/invoices/datev"
+              className="rounded-lg border border-[#e9edf2] px-3 py-1.5 text-sm font-medium text-[#0f172a] hover:bg-[#f8fafc]"
+            >
+              DATEV-Export
+            </a>
+          </div>
+        </div>
         {sortedInvoices.length === 0 ? (
           <div className="rounded-2xl border border-[#e9edf2] bg-white p-4 text-sm text-[#64748b]">
             Noch keine Rechnungen erstellt.
@@ -275,6 +301,7 @@ export default async function InvoicesPage() {
                   <th className="px-4 py-2.5 font-medium">Fällig am</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
                   <th className="px-4 py-2.5 text-right font-medium">Betrag</th>
+                  <th className="px-4 py-2.5 font-medium">Korrektur</th>
                 </tr>
               </thead>
               <tbody>
@@ -303,6 +330,14 @@ export default async function InvoicesPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono text-[#0f172a]">
                       {formatEuros(invoice.totalCents)}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <CreditNoteForm
+                        invoiceId={invoice.id}
+                        invoiceNumber={invoice.invoiceNumber}
+                        totalCents={invoice.totalCents}
+                        alreadyVoided={voidedAtById.get(invoice.id) !== null && voidedAtById.get(invoice.id) !== undefined}
+                      />
                     </td>
                   </tr>
                 ))}
