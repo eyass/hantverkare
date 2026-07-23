@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/organizations/getCurrentOrg";
+import { syncInvoiceToLexoffice } from "@/lib/integrations/lexoffice/sync";
 import { priceLineItem, computeTotals } from "@/lib/quotes/pricing";
 import { computeExpiryDate } from "@/lib/quotes/expiry";
 import { buildPhotoStoragePath, validatePhotoFile, QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
@@ -202,6 +204,13 @@ export async function createInvoice(quoteId: string): Promise<CreateInvoiceResul
     console.error("Failed to create invoice:", insertError);
     return { error: "Rechnung konnte nicht erstellt werden." };
   }
+
+  // Best-effort lexoffice push (issue #165): uses the service-role admin
+  // client since it needs organizations.lexoffice_api_key, which is never
+  // exposed via a client-scoped select. Never awaited-into-failure -- the
+  // invoice above is already committed and returned to the caller regardless
+  // of what happens here; syncInvoiceToLexoffice swallows all its own errors.
+  await syncInvoiceToLexoffice(createAdminClient(), invoice.id);
 
   return { error: null, invoice };
 }
