@@ -318,6 +318,66 @@ export async function finalizeQuote(quoteId: string): Promise<{ error: string | 
   return { error: null };
 }
 
+/**
+ * Configures (or clears) the deposit percentage a customer will be asked to
+ * pay at signing time (issue #162). Allowed any time before the quote is
+ * signed -- draft or final -- since the tradesperson may want to add a
+ * deposit requirement right up until the customer actually confirms. Once a
+ * quote is signed the amount is locked in (snapshotted onto
+ * deposit_amount_cents by the sign flow in app/q/[token]/actions.ts), so
+ * changing the percentage afterwards would be misleading and is rejected.
+ *
+ * The actual Stripe Checkout Session is only ever created later, at signing
+ * time -- see lib/payments/createDepositCheckoutSession.ts -- this action
+ * only stores the tradesperson's chosen percentage.
+ */
+export async function setDepositPercent(
+  quoteId: string,
+  percent: number | null,
+): Promise<{ error: string | null }> {
+  if (percent !== null && (!Number.isInteger(percent) || percent < 1 || percent > 100)) {
+    return { error: "Anzahlung muss zwischen 1 und 100 Prozent liegen." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Bitte melde dich an." };
+  }
+
+  const org = await getCurrentOrg(supabase);
+  if (!org) {
+    return { error: "Keine Organisation gefunden." };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("id, organization_id, status")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote || quote.organization_id !== org.organizationId) {
+    return { error: "Angebot nicht gefunden." };
+  }
+  if (quote.status === "signed" || quote.status === "declined") {
+    return { error: "Anzahlung kann nach Unterschrift nicht mehr geändert werden." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotes")
+    .update({ deposit_percent: percent })
+    .eq("id", quoteId);
+  if (updateError) {
+    console.error("Failed to set deposit percent:", updateError);
+    return { error: "Anzahlung konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath(`/quotes/${quoteId}`);
+  return { error: null };
+}
+
 type PhotoRow = {
   id: string;
   storage_path: string;
