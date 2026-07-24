@@ -19,10 +19,11 @@
 --    0034; the stock triggers from 0026) keep working unmodified.
 --
 -- 2. Two missing FK indexes found by scanning supabase/migrations/*.sql:
---      - recurring_contracts.source_quote_id (0024_recurring_contracts.sql,
---        references quotes(id) on delete cascade) has no index anywhere,
---        so cascade deletes from quotes and any lookup of a contract by
---        its source quote both do a sequential scan.
+--      - contracts.source_quote_id (0024_recurring_contracts.sql, the
+--        table is named `contracts`, not `recurring_contracts` -- references
+--        quotes(id) on delete cascade) has no index anywhere, so cascade
+--        deletes from quotes and any lookup of a contract by its source
+--        quote both do a sequential scan.
 --      - quotes.customer_id (0007_quote_customer_link.sql) has no
 --        dedicated index despite being filtered on via
 --        .eq("customer_id", ...) in app code (customer detail/history
@@ -126,8 +127,8 @@ $$;
 -- 2. Missing FK indexes
 -- ---------------------------------------------------------------------------
 
-create index if not exists recurring_contracts_source_quote_id_idx
-  on public.recurring_contracts (source_quote_id);
+create index if not exists contracts_source_quote_id_idx
+  on public.contracts (source_quote_id);
 
 create index if not exists quotes_customer_id_idx
   on public.quotes (customer_id);
