@@ -237,7 +237,10 @@ export function QuotePdfDocument({
                       <Text>{item.description}</Text>
                       {itemPhotos.length > 0 && (
                         <View style={styles.lineItemPhotos}>
+                          {/* This is @react-pdf/renderer's Image component, not an HTML
+                              <img> -- it has no alt prop; jsx-a11y is matching on the name alone. */}
                           {itemPhotos.map((photo) => (
+                            // eslint-disable-next-line jsx-a11y/alt-text
                             <Image key={photo.id} style={styles.lineItemPhoto} src={photo.url!} />
                           ))}
                         </View>
