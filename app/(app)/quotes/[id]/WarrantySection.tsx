@@ -1,6 +1,4 @@
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
+import { formatDateShort as formatDate } from "@/lib/format";
 
 export type WarrantyRecord = {
   id: string;

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { convertQuoteToContract } from "./actions";
 import { CONTRACT_INTERVALS, CONTRACT_INTERVAL_LABELS, type ContractInterval } from "@/lib/contracts/interval";
+import { formatDateShort as formatDate } from "@/lib/format";
 
 type Contract = {
   id: string;
@@ -10,10 +11,6 @@ type Contract = {
   status: string;
   next_due_date: string;
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
 
 export function ContractSection({
   quoteId,

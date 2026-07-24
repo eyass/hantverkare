@@ -1,14 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
+import { formatEuros, formatDateShort as formatDate } from "@/lib/format";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { deleteQuoteTemplate } from "./actions";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
 import { QUOTE_TEMPLATES_DICTIONARY } from "./quote-templates.dictionary";
+import { formatDateShort as formatDate } from "@/lib/format";
 
 type Template = {
   id: string;
@@ -12,10 +13,6 @@ type Template = {
   createdAt: string;
   itemCount: number;
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
 
 export function QuoteTemplatesEditor({ templates: initialTemplates }: { templates: Template[] }) {
   const { language } = useAppLanguage();

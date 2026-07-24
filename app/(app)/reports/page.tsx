@@ -9,10 +9,7 @@ import {
 } from "@/lib/reports/dateRange";
 import { REPORTS_DICTIONARY } from "./reports.dictionary";
 import { summarizeDeclinedQuotes, type DeclinedQuoteRow } from "@/lib/reports/declinedQuotes";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
+import { formatEuros } from "@/lib/format";
 
 function formatPercent(ratio: number): string {
   return ratio.toLocaleString("de-DE", { style: "percent", maximumFractionDigits: 1 });

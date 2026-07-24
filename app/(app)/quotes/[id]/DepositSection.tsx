@@ -2,14 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { setDepositPercent } from "./actions";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE", { year: "numeric", month: "long", day: "numeric" });
-}
+import { formatEuros, formatDate as formatDateTime } from "@/lib/format";
 
 /**
  * Deposit (Anzahlung) configuration + status, issue #162.

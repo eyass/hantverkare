@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { groupLineItems } from "@/lib/quotes/groupLineItems";
+import { formatEuros, formatDateShort } from "@/lib/format";
 import { groupPhotosByLineItem, photosForLineItem } from "@/lib/quotes/photosByLineItem";
 
 export type PdfLineItem = {
@@ -149,15 +150,11 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
 function formatDate(value: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString("de-DE");
+  return formatDateShort(date);
 }
 
 export function QuotePdfDocument({

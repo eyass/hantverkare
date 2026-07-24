@@ -2,16 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addMemberComment, type QuoteCommentRow } from "./actions";
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { formatDateTime } from "@/lib/format";
 
 // Tradesperson-side half of the #155 comment thread -- mirrors
 // PhotosSection's "list + inline add form" shape. Visible regardless of

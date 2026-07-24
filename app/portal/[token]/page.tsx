@@ -2,14 +2,11 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashPortalToken } from "@/lib/portal/token";
 import { setPortalSessionCookie, getPortalSession } from "@/lib/portal/session";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
+import { formatEuros, formatDate as formatDateBase } from "@/lib/format";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
+  return formatDateBase(iso);
 }
 
 const QUOTE_STATUS_LABELS: Record<string, string> = {

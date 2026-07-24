@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
 import { listTimeEntries } from "./time-entry-actions";
 import { TimeTrackingSection } from "./TimeTrackingSection";
+import { formatEuros } from "@/lib/format";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",
@@ -10,10 +11,6 @@ const STATUS_LABELS: Record<string, string> = {
   signed: "Signiert",
   declined: "Abgelehnt",
 };
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
 
 /**
  * Read-only job view for the assignee (issue #128) -- the "shared job link"
