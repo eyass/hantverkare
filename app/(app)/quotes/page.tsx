@@ -8,14 +8,7 @@ import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
 import { QUOTES_DICTIONARY } from "./quotes.dictionary";
 import { isStalledQuote, daysSinceFinalized } from "@/lib/quotes/followup";
 import { StalledQuotesSection, type StalledQuote } from "./StalledQuotesSection";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
+import { formatEuros, formatDateShort as formatDate } from "@/lib/format";
 
 function formatJobDateTime(iso: string): string {
   return new Date(iso).toLocaleString("de-DE", {

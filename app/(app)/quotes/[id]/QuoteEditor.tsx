@@ -10,6 +10,7 @@ import {
   bulkAdjustLineItemPrices,
 } from "./actions";
 import { groupLineItems } from "@/lib/quotes/groupLineItems";
+import { formatEuros, formatDate } from "@/lib/format";
 import { InvoiceSection } from "./InvoiceSection";
 import { WarrantySection, type WarrantyRecord } from "./WarrantySection";
 import { ContractSection } from "./ContractSection";
@@ -109,14 +110,6 @@ function statusBadgeClasses(status: string): string {
   if (status === "final") return "bg-[#dbeafe] text-[#1d4ed8]";
   if (status === "signed") return "bg-[#dcfce7] text-[#16a34a]";
   return "bg-[#f1f5f9] text-[#64748b]";
-}
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
 }
 
 function formatPercent(ratio: number): string {

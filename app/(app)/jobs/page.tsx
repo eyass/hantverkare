@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computeQuoteDisplayStatus } from "@/lib/quotes/status";
+import { formatEuros, formatDateShort as formatDate } from "@/lib/format";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",
@@ -16,14 +17,6 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   signed: "bg-[#dcfce7] text-[#16a34a]",
   declined: "bg-[#fee2e2] text-[#b91c1c]",
 };
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
 
 /**
  * "Meine Jobs" (issue #128): a lightweight, read-only list of the quotes

@@ -8,16 +8,9 @@ import { DepositPayPrompt } from "./DepositPayPrompt";
 import { groupLineItems } from "@/lib/quotes/groupLineItems";
 import { groupPhotosByLineItem, photosForLineItem } from "@/lib/quotes/photosByLineItem";
 import { QUOTE_PHOTOS_BUCKET } from "@/lib/quotes/photoValidation";
+import { formatEuros, formatDate } from "@/lib/format";
 
 const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, plenty for a page view
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
-}
 
 export default async function PublicQuotePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

@@ -4,14 +4,11 @@ import { canViewBilling } from "@/lib/organizations/permissions";
 import { getUserLanguage } from "@/lib/i18n/getUserLanguage";
 import { BILLING_DICTIONARY } from "./billing.dictionary";
 import { createCheckoutSession, createBillingPortalSession } from "./actions";
+import { formatDate as formatDateBase } from "@/lib/format";
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleDateString("de-DE", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  return formatDateBase(iso);
 }
 
 export default async function BillingPage() {

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createInvoice, createInvoicePaymentSession } from "./actions";
+import { formatEuros, formatDateShort as formatDate } from "@/lib/format";
 
 type Invoice = {
   id: string;
@@ -13,14 +14,6 @@ type Invoice = {
   payment_status: "unpaid" | "partial" | "paid";
   amount_paid_cents: number;
 };
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
 
 function paymentStatusLabel(status: Invoice["payment_status"]): string {
   if (status === "paid") return "Bezahlt";

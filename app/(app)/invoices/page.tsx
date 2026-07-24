@@ -9,14 +9,7 @@ import {
 import { buildCashFlowForecast, type CashFlowContract, type CashFlowInvoice, type CashFlowQuote } from "@/lib/cash-flow/forecast";
 import { GobdComplianceNotice } from "./GobdComplianceNotice";
 import { CreditNoteForm } from "./CreditNoteForm";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("de-DE");
-}
+import { formatEuros, formatDateShort as formatDate } from "@/lib/format";
 
 const BUCKET_LABELS: Record<PaymentBucket, string> = {
   paid: "Bezahlt",

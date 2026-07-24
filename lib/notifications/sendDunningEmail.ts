@@ -5,6 +5,7 @@
 // invoice, once per stage. Best-effort: these must NEVER throw, so one failed
 // send can never stop the cron from processing the rest of the batch.
 import { calculateVerzugszinsenCents, STATUTORY_DEFAULT_INTEREST_RATE } from "@/lib/invoices/dunning";
+import { formatEuros, formatDateShort as formatDate } from "@/lib/format";
 
 export type DunningTone = "freundlich" | "neutral" | "streng";
 export type DunningEmailStage = "reminder" | "mahnung" | "escalation";
@@ -19,14 +20,6 @@ type SendDunningEmailInput = {
   dueDate: Date;
   invoiceId: string;
 };
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("de-DE");
-}
 
 function subjectFor(stage: DunningEmailStage, invoiceNumber: string): string {
   switch (stage) {

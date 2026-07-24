@@ -8,10 +8,7 @@
 import { useState, useTransition } from "react";
 import { TimeEntryForm } from "./TimeEntryForm";
 import { deleteTimeEntry, type TimeEntryRow } from "./time-entry-actions";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
+import { formatDateShort as formatDate } from "@/lib/format";
 
 function formatHours(hours: number): string {
   return hours.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

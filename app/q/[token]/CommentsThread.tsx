@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addCustomerComment } from "./actions";
+import { formatDateTime } from "@/lib/format";
 
 export type PublicCommentRow = {
   id: string;
@@ -10,16 +11,6 @@ export type PublicCommentRow = {
   body: string;
   created_at: string;
 };
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 // Customer-side half of the #155 comment thread, shown on the public
 // share-token quote page alongside SignForm/DeclineForm. No auth: the

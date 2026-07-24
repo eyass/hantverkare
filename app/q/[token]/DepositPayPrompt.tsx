@@ -2,10 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { requestDepositCheckout } from "./actions";
-
-function formatEuros(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
+import { formatEuros } from "@/lib/format";
 
 /**
  * Customer-facing "pay deposit" prompt (issue #162), shown on the signed-

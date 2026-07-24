@@ -6,6 +6,7 @@ import { PageHero } from "@/components/marketing/PageHero";
 import { AnimatedSection } from "@/components/marketing/AnimatedSection";
 import { getAllPostSlugs, getPostBySlug } from "@/lib/blog/posts";
 import { renderMarkdown } from "@/lib/blog/renderMarkdown";
+import { formatDate as formatDateBase } from "@/lib/format";
 
 type BlogPostPageProps = {
   params: Promise<{ slug: string }>;
@@ -46,7 +47,7 @@ function formatDate(iso: string): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
+  return formatDateBase(date);
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {

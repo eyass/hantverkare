@@ -2,15 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CONTRACT_INTERVAL_LABELS, type ContractInterval } from "@/lib/contracts/interval";
 import { contractRiskReason, CONTRACT_RISK_LABELS, type ContractRiskReason } from "@/lib/contracts/dunning";
+import { formatDateShort as formatDate } from "@/lib/format";
 
 const RISK_BADGE_CLASSES: Record<ContractRiskReason, string> = {
   renewal_failed: "bg-[#fee2e2] text-[#b91c1c]",
   invoice_overdue: "bg-[#fef3c7] text-[#b45309]",
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE");
-}
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Aktiv",

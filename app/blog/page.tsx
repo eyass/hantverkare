@@ -4,6 +4,7 @@ import { MarketingShell } from "@/components/MarketingShell";
 import { PageHero } from "@/components/marketing/PageHero";
 import { AnimatedSection } from "@/components/marketing/AnimatedSection";
 import { getAllPosts } from "@/lib/blog/posts";
+import { formatDate as formatDateBase } from "@/lib/format";
 
 const TITLE = "Blog — Angebote, Kalkulation und Digitalisierung für Handwerker";
 const DESCRIPTION =
@@ -31,7 +32,7 @@ function formatDate(iso: string): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
+  return formatDateBase(date);
 }
 
 export default function BlogIndexPage() {
